@@ -36,10 +36,10 @@ REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 PORT = os.path.join(REPO, "ports", "jibo")
 sys.path.insert(0, os.path.join(PORT, "tools"))
 
-from export_jdw import load_merged, meta_for  # noqa: E402
+from export_jdw import dynamic_allocation, load_merged, meta_for  # noqa: E402
 from gptq import calibration_hessians  # noqa: E402
 from jdt import build_jdt  # noqa: E402
-from jdw import dequantise, quantise, tensors_from_model, write_jdw  # noqa: E402
+from jdw import dequantise, layer_matrices, quantise, tensors_from_model, write_jdw  # noqa: E402
 
 from strands_decider.infer import EngineConfig, SystemOneEngine  # noqa: E402
 from strands_decider.modeling import StrandsDeciderConfig, StrandsDeciderModel  # noqa: E402
@@ -137,14 +137,21 @@ def built(tmp_path_factory):
     prompts = [merged.tokenizer(render_state(r.state) + render_question(q).text)["input_ids"]
                for r in REQUESTS for q in r.questions.values()]
     hessians = calibration_hessians(merged.torso, prompts)
-    for kind in ("f32", "q8", "q4", "q4-gptq"):
+    # a budget for about half the matrices' upgrade to q8
+    half = sum(w.numel() // 32 * 16 for _, w in layer_matrices(merged.torso)) / 2e6
+    packed, allocation = dynamic_allocation(merged.torso, hessians, half)
+    assert 0 < len(allocation["q8"]) < len(packed)
+    for kind in ("f32", "q8", "q4", "q4-gptq", "q4-dynamic"):
         d = tmp / kind
         d.mkdir()
         k = kind.split("-")[0]
+        dyn = kind.endswith("dynamic")
         with torch.no_grad():
             write_jdw(str(d / "model.jdw"), meta_for(merged, str(ckpt), k),
                       tensors_from_model(merged.torso, merged.head, merged.config, k, "f32",
-                                         hessians if kind.endswith("gptq") else None))
+                                         hessians if kind.endswith(("gptq", "dynamic")) else None,
+                                         frozenset(allocation["q8"]) if dyn else frozenset(),
+                                         packed if dyn else None))
         (d / "tokenizer.jdt").write_bytes(build_jdt(merged.tokenizer.backend_tokenizer.to_str()))
         exports[kind] = d
     engine = SystemOneEngine(StrandsDeciderModel.load(str(ckpt)), EngineConfig(device="cpu"))
@@ -189,7 +196,7 @@ def test_c_runtime_answers_as_torch_does(built, request_index, prefix_cache):
             assert g["choice"] == w["choice"]
 
 
-@pytest.mark.parametrize(("kind", "tol"), [("q8", 0.02), ("q4", 0.2), ("q4-gptq", 0.2)])
+@pytest.mark.parametrize(("kind", "tol"), [("q8", 0.02), ("q4", 0.2), ("q4-gptq", 0.2), ("q4-dynamic", 0.2)])
 def test_quantised_weights_stay_close(built, kind, tol):
     binary, exports, _ = built
     _, f32 = _ask(binary / "jibo-decider", exports["f32"], REQUESTS[1])

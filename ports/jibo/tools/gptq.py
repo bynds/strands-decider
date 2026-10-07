@@ -122,3 +122,26 @@ def pack_q4(q: np.ndarray, scales: np.ndarray) -> bytes:
     packed = (u[..., 0::2] | (u[..., 1::2] << 4)).astype(np.uint8)
     blocks = np.concatenate([scales.reshape(rows, -1, 1).view(np.uint8).reshape(rows, -1, 2), packed], axis=-1)
     return np.ascontiguousarray(blocks).tobytes()
+
+
+def hessian_error(w: np.ndarray, wq: np.ndarray, hessian: np.ndarray) -> float:
+    """The quantisation error of a matrix as its output sees it on the calibration activations,
+    relative to the output: tr(E H E^T) / tr(W H W^T), E = W - Wq. It is what GPTQ minimises,
+    and a sensitivity score in the spirit of an importance matrix."""
+    H = hessian.astype(np.float64)
+    e = (w - wq).astype(np.float64)
+    w64 = w.astype(np.float64)
+    return float(np.einsum("ij,jk,ik->", e, H, e) / max(1e-30, np.einsum("ij,jk,ik->", w64, H, w64)))
+
+
+def allocate_q8(scores: dict[str, float], extra_bytes: dict[str, int], budget: int) -> list[str]:
+    """Which matrices to raise from q4 to q8 within `budget` extra bytes: greedily the largest
+    error removed per byte spent (q8's own error is about 1% of q4's, so upgrading a matrix
+    removes nearly all of its error)."""
+    order = sorted(scores, key=lambda n: scores[n] / extra_bytes[n], reverse=True)
+    chosen, spent = [], 0
+    for name in order:
+        if spent + extra_bytes[name] <= budget:
+            chosen.append(name)
+            spent += extra_bytes[name]
+    return chosen

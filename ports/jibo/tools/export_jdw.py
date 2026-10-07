@@ -1,7 +1,7 @@
 """Export a decider checkpoint for the C runtime: model.jdw, tokenizer.jdt and a manifest.
 
     python ports/jibo/tools/export_jdw.py CHECKPOINT OUT_DIR [--weights f32|q8|q4] [--embed f32|bf16]
-        [--gptq N [--calib-file FILE ...]] [--q8 down,o,...]
+        [--gptq N [--calib-file FILE ...] [--q8-budget-mb M]] [--q8 down,o,...]
 
 CHECKPOINT is anything StrandsDeciderModel.load accepts: a checkpoint directory or a Hub id.
 The torso is loaded in fp32, the LoRA adapter is merged in fp32 (W + alpha/r * B A), and then
@@ -14,6 +14,11 @@ prompts rendered from the calibration files (by default the training corpus's
 data/train_v5.jsonl, data/multistep_v14.jsonl and data/generated_v16p.jsonl, read in turn),
 each cut to its first 512 tokens. The format, and so the runtime, is the same. --q8 names
 matrix types (qkv, z, out, q, k, v, o, gate, up, down) to keep at 8 bits in a q4 export.
+
+--q8-budget-mb M allocates bit widths per matrix, in the manner of Unsloth's dynamic quants: every
+matrix is quantised to q4 with GPTQ and scored by its Hessian-weighted output error (gptq.
+hessian_error), and the matrices that remove the most error per byte are raised to q8 until M
+extra megabytes are spent. The choice and the scores go into the manifest.
 """
 
 from __future__ import annotations
@@ -29,9 +34,22 @@ import torch
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
-from gptq import calibration_hessians  # noqa: E402
+from gptq import (  # noqa: E402
+    allocate_q8,
+    calibration_hessians,
+    hessian_error,
+    pack_q4,
+    quantise_gptq,
+)
 from jdt import build_jdt  # noqa: E402
-from jdw import tensors_from_model, write_jdw  # noqa: E402
+from jdw import (  # noqa: E402
+    Q4,
+    SHARED_INPUT,
+    dequantise,
+    layer_matrices,
+    tensors_from_model,
+    write_jdw,
+)
 
 from strands_decider.data.format import read_jsonl  # noqa: E402
 from strands_decider.modeling import StrandsDeciderModel, checkpoint_dir  # noqa: E402
@@ -114,6 +132,23 @@ def meta_for(model: StrandsDeciderModel, checkpoint: str, weights: str) -> dict[
     return {k: str(v) for k, v in meta.items()}
 
 
+def dynamic_allocation(torso: torch.nn.Module, hessians: dict[str, torch.Tensor], budget_mb: float):
+    """GPTQ every layer matrix to q4, score each by its Hessian-weighted error, and choose the
+    matrices to raise to q8 within budget_mb extra megabytes. Returns the packed q4 bytes (reused
+    for the matrices left at q4) and the allocation for the manifest."""
+    packed, scores, extra = {}, {}, {}
+    for name, w in layer_matrices(torso):
+        a = w.detach().float().numpy()
+        layer, short = name.split(".", 1)
+        h = hessians[f"{layer}.{SHARED_INPUT[short]}"].numpy()
+        packed[name] = pack_q4(*quantise_gptq(a, h))
+        scores[name] = hessian_error(a, dequantise(packed[name], Q4, *a.shape), h)
+        extra[name] = a.size // 32 * (34 - 18)
+    chosen = allocate_q8(scores, extra, int(budget_mb * 1e6))
+    return packed, {"budget_mb": budget_mb, "q8": chosen,
+                    "extra_mb": sum(extra[n] for n in chosen) / 1e6, "q4_scores": scores}
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("checkpoint")
@@ -123,6 +158,8 @@ def main() -> None:
     ap.add_argument("--gptq", type=int, default=0, metavar="N", help="GPTQ q4 with N calibration prompts")
     ap.add_argument("--calib-file", action="append", default=None)
     ap.add_argument("--q8", default="", help="comma-separated matrix types kept at 8 bits")
+    ap.add_argument("--q8-budget-mb", type=float, default=0.0,
+                    help="with --gptq: raise the most sensitive matrices to q8 within this many MB")
     args = ap.parse_args()
     q8 = frozenset(x for x in args.q8.split(",") if x)
     os.makedirs(args.out_dir, exist_ok=True)
@@ -142,10 +179,19 @@ def main() -> None:
         hessians = calibration_hessians(model.torso, prompts)
         meta["gptq"] = f"{len(prompts)} prompts, {sum(map(len, prompts))} tokens, from " + ",".join(
             os.path.relpath(f, REPO) for f in files)
+    packed: dict[str, bytes] = {}
+    allocation = None
+    if hessians is not None and args.q8_budget_mb > 0:
+        packed, allocation = dynamic_allocation(model.torso, hessians, args.q8_budget_mb)
+        chosen = allocation["q8"]
+        q8 = q8 | frozenset(chosen)
+        meta["q8_matrices"] = ",".join(chosen)
+        print(f"[export] {len(chosen)} of {len(packed)} matrices raised to q8, "
+              f"{allocation['extra_mb']:.1f} MB: {', '.join(chosen)}")
     jdw_path = os.path.join(args.out_dir, "model.jdw")
     with torch.no_grad():
         jdw_sha = write_jdw(jdw_path, meta, tensors_from_model(
-            model.torso, model.head, model.config, args.weights, args.embed, hessians, q8))
+            model.torso, model.head, model.config, args.weights, args.embed, hessians, q8, packed))
 
     sources = {}
     for root, _, files in os.walk(src, followlinks=True):
@@ -159,6 +205,7 @@ def main() -> None:
         "model.jdw": {"sha256": jdw_sha, "bytes": os.path.getsize(jdw_path)},
         "tokenizer.jdt": {"sha256": sha256_file(jdt_path), "bytes": os.path.getsize(jdt_path)},
         "meta": meta,
+        "allocation": allocation,
         "source_files_sha256": sources,
     }
     with open(os.path.join(args.out_dir, "manifest.json"), "w", encoding="utf-8") as fh:

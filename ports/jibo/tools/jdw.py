@@ -130,18 +130,40 @@ def bf16(name: str, t: torch.Tensor) -> Tensor:
                   lambda: t.detach().to(torch.bfloat16).contiguous().view(torch.int16).numpy().tobytes())
 
 
+def layer_matrices(model: torch.nn.Module) -> Iterable[tuple[str, torch.Tensor]]:
+    """Every matrix the exporter may quantise, as (runtime name, weight)."""
+    for i, layer in enumerate(model.layers):
+        p = f"l{i}."
+        if layer.block_type == "linear_attention":
+            la = layer.linear_attn
+            yield p + "qkv", la.in_proj_qkv.weight
+            yield p + "z", la.in_proj_z.weight
+            yield p + "out", la.out_proj.weight
+        else:
+            at = layer.self_attn
+            yield from ((p + "q", at.q_proj.weight), (p + "k", at.k_proj.weight),
+                        (p + "v", at.v_proj.weight), (p + "o", at.o_proj.weight))
+        yield from ((p + "gate", layer.mlp.gate_proj.weight), (p + "up", layer.mlp.up_proj.weight),
+                    (p + "down", layer.mlp.down_proj.weight))
+
+
 def tensors_from_model(model: torch.nn.Module, head: torch.nn.Module, cfg: object, kind: str,
                        embed_kind: str, hessians: dict[str, torch.Tensor] | None = None,
-                       q8: frozenset[str] = frozenset()) -> Iterable[Tensor]:
+                       q8: frozenset[str] = frozenset(), packed: dict[str, bytes] | None = None
+                       ) -> Iterable[Tensor]:
     """The torso (LoRA already merged, fp32) and the pointer head, in runtime names. With
-    `hessians` (gptq.calibration_hessians), q4 matrices are quantised with GPTQ. Matrices whose
-    short name (qkv, z, out, q, k, v, o, gate, up, down) is in `q8` are written q8 instead."""
+    `hessians` (gptq.calibration_hessians), q4 matrices are quantised with GPTQ. A matrix whose
+    short name (qkv, z, out, q, k, v, o, gate, up, down) or full name (l3.down) is in `q8` is
+    written q8 instead. `packed` holds q4 bytes already computed (by the dynamic allocation)."""
     hs = hessians or {}
+    pk = packed or {}
 
     def matrix(name: str, t: torch.Tensor, kind: str) -> Tensor:
         layer, short = name.split(".", 1)
-        if short in q8:
+        if short in q8 or name in q8:
             kind = "q8"
+        elif kind == "q4" and name in pk:
+            return Tensor(name, Q4, tuple(t.shape), lambda: pk[name])
         return _matrix(name, t, kind, hs.get(f"{layer}.{SHARED_INPUT[short]}"))
 
     emb = model.embed_tokens.weight
