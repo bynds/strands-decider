@@ -183,8 +183,8 @@ All on x86 (this is not the robot), against v21 unless marked v22:
   standard 56, hard 54), against the torch engine's 156 for v22 at 512 on an L4 GPU: +8 / -6,
   McNemar p = 0.79. ECE 0.074, Brier 0.415 (torch 0.045, 0.415). Quantisation costs nothing
   measurable on the benchmark; v22 still meets the port's bar (150, 46 easy, ECE 0.10) as the
-  robot would run it. GPTQ alone, without the 8-bit matrices, scores 161 (+3 / -0 against the
-  dynamic export's tasks net, p = 0.51: noise either way) but with an ECE of 0.108, over the
+  robot would run it. GPTQ alone, without the 8-bit matrices, scores 161 (+6 / -3 against the
+  dynamic export's tasks, p = 0.51: noise either way) but with an ECE of 0.108, over the
   bar; the dynamic export stays the robot's, on KL and calibration.
 - **Memory, 0.8B at q4 (a stand-in decider on Qwen3.5-0.8B-Base: right shapes, meaningless
   answers):** 333 MB peak resident set for a three-question request with a 512-token window, on
