@@ -44,6 +44,7 @@ the recipe, that write every file a configuration reads (`train_files`, `teacher
 | v19 | [v19.yaml](../../configs/experiments/v19.yaml) | `build fetch multistep generated adequacy distill` |
 | v19-seed1 | [v19-seed1.yaml](../../configs/experiments/v19-seed1.yaml) | as v19 |
 | v20 | [v20.yaml](../../configs/experiments/v20.yaml) | the route in the header of `recipe.sh`: `training/recipe.sh build fetch multistep generated adequacy catchall distill`, then `TRAIN_CONFIG=configs/experiments/v20.yaml CKPT=checkpoints/hobson-2b-v20-retrain training/recipe.sh train calibrate eval` |
+| v22 | [v22.yaml](../../configs/experiments/v22.yaml) | as v19: `build fetch multistep generated adequacy distill`, then `TRAIN_CONFIG=configs/experiments/v22.yaml CKPT=checkpoints/hobson-0.8b-v22 training/recipe.sh train calibrate eval` |
 
 v19-calmix trains nothing. It refits temperatures with `evaluation/calibrate_mix.py`. The v19
 reference recipe is `configs/train.yaml` with its parent `configs/train-parent.yaml`.

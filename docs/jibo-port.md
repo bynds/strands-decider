@@ -22,7 +22,7 @@ below, and its ncnn alternative (section 7) does not apply.
 - [Plan](#plan)
 - [Coexistence and safety rules](#coexistence-and-safety-rules)
 - [Risks](#risks)
-- [Decisions for the owner](#decisions-for-the-owner)
+- [Decisions](#decisions)
 - [Alternatives considered](#alternatives-considered)
 
 ## Summary
@@ -138,8 +138,8 @@ estimate of 15 to 25 MB, to be measured.
 Estimated resident set for the 0.8B decider at 4 bits with a 512-token window: about 280 MB
 of weights, 20 MB of tokenizer and about 70 MB of state and scratch, so **about 370 MB plus
 whatever the GL driver allocates for a context**. That fits inside the 600 MB of headroom. It
-does not fit the handoff's initial 200 MiB prototype limit, which was set for Needle.
-[Decisions for the owner](#decisions-for-the-owner) raises this. The 2B decider at 4 bits
+does not fit the handoff's initial 200 MiB prototype limit, which was set for Needle; the owner
+has since set the limit at about 400 MB ([Decisions](#decisions)). The 2B decider at 4 bits
 would need about 870 MB and cannot run. At about 2.5 bits per weight it would squeeze into
 roughly 520 MB, but that leaves no margin and costs accuracy that has not been measured.
 
@@ -601,22 +601,27 @@ These are inherited from the handoff and are binding on every phase:
 | Thermal rise during multi-second GPU work | Throttling, or a trip near the 62 °C sensor | Temperature-gated governor; sustained runs in Phase 8 before any skill depends on it |
 | Seconds of latency is not useful for the owner's decisions | Low value | Gate G3; [Alternatives considered](#alternatives-considered) lists a LAN fallback |
 
-## Decisions for the owner
+## Decisions
 
-1. **Target.** This design ports this repository's decider, not `needle-rs`. Phases 0, 4 (the
-   toolchain and ABI work), 5 and 6's method apply to either, if Needle remains a goal too.
-2. **Memory budget.** The 0.8B decider needs roughly 370 MB plus GL overhead, against the
-   handoff's initial 200 MiB. Should the limit rise, given the 600 MB headroom, or should Phase
-   9 go straight to a truncated torso?
-3. **Training a 0.8B decider** (Phase 9). It is one run under a preregistration, and should
-   take less than the 2B recipe's 11 hours on one RTX 3090 (an estimate). Its accuracy is an
-   open question.
-4. **Where the code lives.** `ports/jibo/` in this repository (proposed, so parity tests run
-   against the engine they mirror) or a separate repository that pins this one.
-5. **Latency expectations.** Seconds per decision. Which decisions on the robot can wait that
-   long?
-6. **Deployment scope** for Phases 4 to 8: which robot, which directory, which user, and the
-   cleanup procedure.
+Decided by the owner on 7 October 2026:
+
+1. **Target: this repository's decider**, not `needle-rs`.
+2. **Memory: about 400 MB at most** for the whole decider process, GL allocations included.
+   This replaces the handoff's initial 200 MiB. The 0.8B estimate of about 370 MB plus the GL
+   driver's share leaves little margin, so Phase 4 and Phase 6 measure the real total first,
+   and the governor's floor is set against this ceiling.
+3. **Train a 0.8B decider only if it costs under $15** of Hugging Face credits.
+   [PREREGISTRATION-v22.md](../research/preregistrations/PREREGISTRATION-v22.md) records the
+   run, its budget and the bar the port applies to its result.
+4. **The code lives in `ports/jibo/`** in this repository.
+5. **Latency: under 2 s per decision** is the starting target. The estimates above put a
+   128-token prompt on the 0.8B forward at 2 to 6 s on the GPU, so the target is not yet
+   expected to hold. Phase 6 measures it. If it misses, the levers in order are GPU kernel
+   efficiency, shorter prompts from the skills, and a truncated torso under its own
+   preregistration.
+
+Still open: the **deployment scope** for Phases 4 to 8 (which robot, which directory, which
+user, and the cleanup procedure), and access to the Jibo workspace for Phase 0.
 
 ## Alternatives considered
 

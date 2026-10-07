@@ -1,0 +1,59 @@
+# v22: v21b's recipe (configs/experiments/v21b.yaml) on Qwen3.5-0.8B-Base, for the Jibo port
+# (docs/jibo-port.md): the 2B torso's 1.37B layer parameters do not fit the robot's memory.
+# Preregistration: research/preregistrations/PREREGISTRATION-v22.md. Only base_model and
+# output_dir differ from v21b; seed 5 is v21b's released seed. The FAST settings
+# (gradient_checkpointing off, precompute_frozen_kl on) change speed only and fit an 80 GB GPU.
+# Retraining it from the repo:
+#   training/recipe.sh build fetch multistep generated adequacy distill
+#   TRAIN_CONFIG=configs/experiments/v22.yaml CKPT=checkpoints/hobson-0.8b-v22 \
+#     training/recipe.sh train calibrate eval
+
+train_files: ["data/train_v5.jsonl", "data/multistep_v14.jsonl", "data/generated_v16p.jsonl",
+              "data/generated_v18p.jsonl", "data/adequacy_hs2.jsonl", "data/adequacy_gen.jsonl"]
+val_fraction: 0.03
+
+base_model: "Qwen/Qwen3.5-0.8B-Base"
+num_slots: 24           # must match `data build --max-options`; also the KL reference width
+head_type: "pointer"    # scores each option from its own hidden state; see modeling.PointerHead
+pointer_dim: 256
+head_init: "random"     # "lm_head" seeding applies to the slot head only
+kl_frozen_weight: 0.3   # KL(frozen || student) over the option-number readout
+# The frozen 4B's distributions on the short-task rows where it agrees with the gold label
+# (indices into train_v5), and v14's own on the multi-step rows (offset past train_v5);
+# everything after them carries no teacher.
+teacher_file: "data/teacher_v20.jsonl"
+teacher_weight: 1.0
+head_dropout: 0.05
+max_length: 4096
+
+use_lora: true
+lora_r: 16
+lora_alpha: 32
+# Attention and MLP projections, plus the recurrent layers' own; without these LoRA
+# would reach only the 6 full-attention layers of 24.
+lora_targets: ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj",
+               "in_proj_qkv", "in_proj_z", "in_proj_a", "in_proj_b", "out_proj"]
+freeze_torso: false     # true = head-only training (much weaker, but very cheap)
+
+epochs: 1
+micro_batch_size: 8
+grad_accum: 4           # effective batch 32
+lr: 0.0001              # LoRA
+head_lr: 0.001          # randomly-initialised head needs a bigger step
+weight_decay: 0.01
+warmup_ratio: 0.03
+max_grad_norm: 1.0
+gradient_checkpointing: false  # FAST (speed only)
+
+shuffle_options: true   # the whole point -- do not turn this off
+group_by_length: true   # on: ~2k-token documents among ~250-token rows would otherwise
+                        # pad most batches; it changes batch composition, not content
+ordinal_smoothing: 0.1
+reverse_score_prob: 0.5
+
+output_dir: "checkpoints/hobson-0.8b-v22"
+seed: 5
+log_every: 20
+eval_every: 500
+# FAST (speed only)
+precompute_frozen_kl: true
