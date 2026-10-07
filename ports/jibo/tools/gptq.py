@@ -31,7 +31,8 @@ def calibration_hessians(torso: torch.nn.Module, prompts: Iterable[list[int]]) -
 
     def hook_for(key: str):
         def fn(_mod: torch.nn.Module, inputs: tuple[torch.Tensor, ...]) -> None:
-            x = inputs[0].detach().reshape(-1, inputs[0].shape[-1]).to(torch.float64)
+            # fp32 sums: fp64 Hessians of a 2B torso's down-projections alone would take 7 GB
+            x = inputs[0].detach().reshape(-1, inputs[0].shape[-1]).to(torch.float32)
             h = x.T @ x
             acc[key] = acc[key] + h if key in acc else h
         return fn
@@ -56,7 +57,9 @@ def calibration_hessians(torso: torch.nn.Module, prompts: Iterable[list[int]]) -
     finally:
         for h in hooks:
             h.remove()
-    return {k: v / max(1, count["n"]) for k, v in acc.items()}
+    for v in acc.values():
+        v /= max(1, count["n"])
+    return acc
 
 
 def _scale(block: np.ndarray, lo: float, hi: float) -> np.ndarray:

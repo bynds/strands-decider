@@ -139,7 +139,7 @@ def main() -> None:
     if args.gptq and args.weights == "q4":
         files = args.calib_file or [os.path.join(REPO, f) for f in DEFAULT_CALIB]
         prompts = calibration_prompts(model, files, args.gptq)
-        hessians = {k: v.float() for k, v in calibration_hessians(model.torso, prompts).items()}
+        hessians = calibration_hessians(model.torso, prompts)
         meta["gptq"] = f"{len(prompts)} prompts, {sum(map(len, prompts))} tokens, from " + ",".join(
             os.path.relpath(f, REPO) for f in files)
     jdw_path = os.path.join(args.out_dir, "model.jdw")

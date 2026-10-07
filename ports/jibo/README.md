@@ -132,6 +132,17 @@ All on x86 (this is not the robot), against v21:
   (54 answers, states of about 40 to 3,000 tokens, one question and five), no answer changes,
   token counts are identical, every rounded response is byte-identical to the Python engine's,
   and the largest probability difference is 4.9e-5, inside the engine's 4-decimal rounding.
+- **Quantisation, v21 (2B), the same 54 answers against the Python engine in fp32:**
+
+  | weights | answers changed | largest probability difference | median |
+  | --- | --- | --- | --- |
+  | f32 | 0 | 0.00005 (rounding) | |
+  | q8 | 0 | 0.0084 | |
+  | q4, rounded to nearest | 2 (both near coin flips: 0.55 and 0.52 in the reference) | 0.150 | 0.019 |
+
+  q8 passes parity stage 2 but does not fit the memory ceiling (below); plain q4 fits but loses
+  calibration, which is why the exporter has GPTQ (`--gptq N`) and per-type 8-bit overrides
+  (`--q8 down`).
 - **Memory, 0.8B at q4 (a stand-in decider on Qwen3.5-0.8B-Base: right shapes, meaningless
   answers):** 333 MB peak resident set for a three-question request with a 512-token window, on
   x86. At q8 it is 562 MB, over the 400 MB ceiling, so q4 is the format. The file is 795 MB, of
