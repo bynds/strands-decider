@@ -74,8 +74,69 @@ static float dot(const float *a, const float *b, int n) {
 #endif
 }
 
+#ifdef JD_NEON
+static float hsum(float32x4_t v) {
+  float32x2_t r = vadd_f32(vget_low_f32(v), vget_high_f32(v));
+  return vget_lane_f32(vpadd_f32(r, r), 0);
+}
+
+/* Two weight rows against four tokens at a time: 6 loads feed 8 multiply-adds, and the 8
+ * accumulators, 2 weight and 4 activation registers fit ARMv7's 16 quad registers. */
+static void matmul_neon(float *y, int ldy, const float *x, int n, int in, const jd_tensor *w,
+                        float *r0, float *r1) {
+  int out = (int)w->dims[0];
+  for (int o = 0; o < out; o += 2) {
+    int two = o + 1 < out;
+    const float *w0, *w1;
+    if (w->dtype == JD_F32) {
+      w0 = (const float *)w->data + (size_t)o * in;
+      w1 = two ? w0 + in : w0;
+    } else {
+      jd_dequant_row(w, o, r0);
+      if (two) jd_dequant_row(w, o + 1, r1);
+      w0 = r0;
+      w1 = two ? r1 : r0;
+    }
+    int t = 0;
+    for (; t + 4 <= n && in % 4 == 0; t += 4) {
+      const float *x0 = x + (size_t)t * in, *x1 = x0 + in, *x2 = x1 + in, *x3 = x2 + in;
+      float32x4_t a00 = vdupq_n_f32(0), a01 = a00, a02 = a00, a03 = a00;
+      float32x4_t a10 = a00, a11 = a00, a12 = a00, a13 = a00;
+      for (int i = 0; i < in; i += 4) {
+        float32x4_t wa = vld1q_f32(w0 + i), wb = vld1q_f32(w1 + i);
+        float32x4_t v0 = vld1q_f32(x0 + i), v1 = vld1q_f32(x1 + i);
+        float32x4_t v2 = vld1q_f32(x2 + i), v3 = vld1q_f32(x3 + i);
+        a00 = vmlaq_f32(a00, wa, v0); a01 = vmlaq_f32(a01, wa, v1);
+        a02 = vmlaq_f32(a02, wa, v2); a03 = vmlaq_f32(a03, wa, v3);
+        a10 = vmlaq_f32(a10, wb, v0); a11 = vmlaq_f32(a11, wb, v1);
+        a12 = vmlaq_f32(a12, wb, v2); a13 = vmlaq_f32(a13, wb, v3);
+      }
+      float *yt = y + (size_t)t * ldy + o;
+      yt[0] = hsum(a00); yt[ldy] = hsum(a01); yt[2 * ldy] = hsum(a02); yt[3 * ldy] = hsum(a03);
+      if (two) {
+        yt[1] = hsum(a10); yt[ldy + 1] = hsum(a11); yt[2 * ldy + 1] = hsum(a12); yt[3 * ldy + 1] = hsum(a13);
+      }
+    }
+    for (; t < n; t++) {
+      y[(size_t)t * ldy + o] = dot(x + (size_t)t * in, w0, in);
+      if (two) y[(size_t)t * ldy + o + 1] = dot(x + (size_t)t * in, w1, in);
+    }
+  }
+}
+#endif
+
 void jd_matmul(float *y, int ldy, const float *x, int n, int in, const jd_tensor *w) {
   int out = (int)w->dims[0];
+#ifdef JD_NEON
+  {
+    float *r0 = malloc((size_t)in * 2 * sizeof(float));
+    if (r0) {
+      matmul_neon(y, ldy, x, n, in, w, r0, r0 + in);
+      free(r0);
+      return;
+    }
+  }
+#endif
   /* Rows are independent; a test build with -fopenmp splits them across cores. The Jibo
    * build is single-threaded: the robot has about one core to spare. */
 #ifdef _OPENMP
