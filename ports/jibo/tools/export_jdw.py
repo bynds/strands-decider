@@ -1,7 +1,7 @@
 """Export a decider checkpoint for the C runtime: model.jdw, tokenizer.jdt and a manifest.
 
     python ports/jibo/tools/export_jdw.py CHECKPOINT OUT_DIR [--weights f32|q8|q4] [--embed f32|bf16]
-        [--gptq N [--calib-file FILE ...]]
+        [--gptq N [--calib-file FILE ...]] [--q8 down,o,...]
 
 CHECKPOINT is anything StrandsDeciderModel.load accepts: a checkpoint directory or a Hub id.
 The torso is loaded in fp32, the LoRA adapter is merged in fp32 (W + alpha/r * B A), and then
@@ -12,7 +12,8 @@ bf16 stores it exactly, since it is not adapted and the base weights are bf16.
 With --gptq N, the q4 matrices are quantised with GPTQ (tools/gptq.py), calibrated on N
 prompts rendered from the calibration files (by default the training corpus's
 data/train_v5.jsonl, data/multistep_v14.jsonl and data/generated_v16p.jsonl, read in turn),
-each cut to its first 512 tokens. The format, and so the runtime, is the same.
+each cut to its first 512 tokens. The format, and so the runtime, is the same. --q8 names
+matrix types (qkv, z, out, q, k, v, o, gate, up, down) to keep at 8 bits in a q4 export.
 """
 
 from __future__ import annotations
@@ -121,7 +122,9 @@ def main() -> None:
     ap.add_argument("--embed", choices=["f32", "bf16"], default="bf16")
     ap.add_argument("--gptq", type=int, default=0, metavar="N", help="GPTQ q4 with N calibration prompts")
     ap.add_argument("--calib-file", action="append", default=None)
+    ap.add_argument("--q8", default="", help="comma-separated matrix types kept at 8 bits")
     args = ap.parse_args()
+    q8 = frozenset(x for x in args.q8.split(",") if x)
     os.makedirs(args.out_dir, exist_ok=True)
     src = checkpoint_dir(args.checkpoint)
 
@@ -130,6 +133,8 @@ def main() -> None:
     with open(jdt_path, "wb") as fh:
         fh.write(build_jdt(model.tokenizer.backend_tokenizer.to_str()))
     meta = meta_for(model, args.checkpoint, args.weights)
+    if q8:
+        meta["q8_matrices"] = ",".join(sorted(q8))
     hessians = None
     if args.gptq and args.weights == "q4":
         files = args.calib_file or [os.path.join(REPO, f) for f in DEFAULT_CALIB]
@@ -140,7 +145,7 @@ def main() -> None:
     jdw_path = os.path.join(args.out_dir, "model.jdw")
     with torch.no_grad():
         jdw_sha = write_jdw(jdw_path, meta, tensors_from_model(
-            model.torso, model.head, model.config, args.weights, args.embed, hessians))
+            model.torso, model.head, model.config, args.weights, args.embed, hessians, q8))
 
     sources = {}
     for root, _, files in os.walk(src, followlinks=True):

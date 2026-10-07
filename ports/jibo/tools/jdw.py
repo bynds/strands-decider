@@ -131,13 +131,17 @@ def bf16(name: str, t: torch.Tensor) -> Tensor:
 
 
 def tensors_from_model(model: torch.nn.Module, head: torch.nn.Module, cfg: object, kind: str,
-                       embed_kind: str, hessians: dict[str, torch.Tensor] | None = None) -> Iterable[Tensor]:
+                       embed_kind: str, hessians: dict[str, torch.Tensor] | None = None,
+                       q8: frozenset[str] = frozenset()) -> Iterable[Tensor]:
     """The torso (LoRA already merged, fp32) and the pointer head, in runtime names. With
-    `hessians` (gptq.calibration_hessians), q4 matrices are quantised with GPTQ."""
+    `hessians` (gptq.calibration_hessians), q4 matrices are quantised with GPTQ. Matrices whose
+    short name (qkv, z, out, q, k, v, o, gate, up, down) is in `q8` are written q8 instead."""
     hs = hessians or {}
 
     def matrix(name: str, t: torch.Tensor, kind: str) -> Tensor:
         layer, short = name.split(".", 1)
+        if short in q8:
+            kind = "q8"
         return _matrix(name, t, kind, hs.get(f"{layer}.{SHARED_INPUT[short]}"))
 
     emb = model.embed_tokens.weight
