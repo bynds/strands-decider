@@ -678,6 +678,14 @@ user, and the cleanup procedure), and access to the Jibo workspace for Phase 0.
 - **Qwen3-0.6B (all full attention).** It is supported by the older code path, but the
   research found Qwen3.5 about 0.10 better than Qwen3 at matched size
   ([history.md](../research/history.md#what-the-torso-knows-untrained)).
+- **A newer Qwen generation.** Checked on 7 October 2026, after v22 had trained: the design went
+  to Qwen3.5-0.8B as v21's architecture at a smaller size without looking further, and the check
+  came later. Qwen3.6 (April 2026) is published only as 27B and 35B-A3B, and Qwen3.8 (August
+  2026) only as 27B, Flash-Next and 2.4T-A95B; there is no Qwen3.7. The smallest is 27B dense, and
+  a mixture of experts must hold all its experts in memory however few it activates, so none
+  comes near 400 MB. Qwen3.5-0.8B remains the newest Qwen that fits. A small model of a later
+  generation would be worth a preregistered run, and would need new kernels in the runtime
+  unless it keeps Qwen3.5's layer types.
 - **Not native: a LAN call** from a skill to `strands-decider serve` on a desktop. It answers
   in about 115 ms on an RTX 3090 with the full 2B model. This is outside the handoff's
   mission, but it is the cheapest route to good decisions on the robot whenever the network
