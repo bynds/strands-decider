@@ -93,3 +93,45 @@ Only by the Jibo port. The checkpoint is published to the owner's Hugging Face a
 private model, exported to the port's weight format, and taken through the port's parity
 stages. A further run truncating the torso to fewer layers would need its own
 preregistration.
+
+## Outcome (added after the run)
+
+Nothing above this section was edited after training. **v22 meets the bar for the Jibo port**
+(156 of 231 at 4096, 48 of 48 easy, ECE 0.054) and goes forward as the port's model. Of the six
+predictions, four held; 3 failed because MuSiQue came in *above* its range, and 6 failed on
+Brier.
+
+| | prediction | v21 (seed 5) | v22 | |
+| --- | --- | --- | --- | --- |
+| 1 | JevBench at 4096: 145 to 165 | 176 | 156 | pass |
+| 2 | easy >= 46; standard 55 to 64; hard 45 to 56 | 48 / 67 / 61 | 48 / 55 / 53 | pass |
+| 3 | MuSiQue 0.80-0.87, ContractNLI 0.80-0.86, BoardgameQA 0.70-0.80, HotpotQA 0.62-0.72 | 0.882 / 0.865 / 0.821 / 0.746 | **0.890** / 0.845 / 0.774 / 0.635 | FAIL (MuSiQue above) |
+| 4 | held-out short tasks 0.60 to 0.65 | 0.650 | 0.640 | pass |
+| 5 | HelpSteer2 0.66 to 0.73, generated 0.72 to 0.80 | 0.739 / 0.788 | 0.688 / 0.738 | pass |
+| 6 | JevBench ECE <= 0.09; Brier 0.34 to 0.40 | 0.064; 0.323 | 0.054; **0.425** | FAIL (Brier) |
+
+**The smaller torso lost where reading is long and indirect, not where it is short.** HotpotQA,
+never trained on, fell most (0.746 -> 0.635), then BoardgameQA (0.821 -> 0.774) and the
+adequacy sets (about -0.05 each); held-out short tasks barely moved (0.650 -> 0.640), and
+MuSiQue held level (0.882 -> 0.890), which the prediction did not allow for. The generated
+documents split: v16's set 0.849 -> 0.809, v18's 0.741 -> 0.749. Instruction-flip pairs are at
+chance (both right 0.217), as expected for v21b's rows, which hold no flips.
+
+**JevBench: 156 of 231 at 4096**, 20 below v21. Easy is untouched; the loss is standard
+(67 -> 55) and hard (61 -> 53). Calibration held in the ECE sense (0.064 -> 0.054) but the Brier
+score rose 0.323 -> 0.425: the 0.8B is wrong more often, and its wrong answers are not
+uncertain enough to keep Brier in range. JevBench's paraphrase consistency 0.806 (29 of 36
+pairs agree; v21 at 512, 0.917).
+
+**At the Jibo runtime's 512-token window the score does not move**: v22 156 at 512 (9 tasks
+gained and 9 lost, all in the hard tier; ECE 0.045, Brier 0.415), and v21 175 at 512 against
+176 at 4096. At 512, v21 against v22 is +27 / -8 for v21 (McNemar p = 0.002), the difference
+entirely in standard (-12) and hard (-7). The window the robot can afford costs nothing
+measurable on JevBench; the torso it can afford costs 19 tasks.
+
+**Run.** One NVIDIA A100-SXM4 80 GB on Hugging Face Jobs: 3,738 steps in 2 h 55 min
+(0.40 steps/s at the end, with gradient checkpointing), peak GPU memory 7.0 GiB; final
+validation loss 0.463, accuracy 0.835. Cost: $7.78 for the run (3 h 7 min including
+calibration and evaluation), $1.03 for the launch that ran out of memory, and $0.05 for
+JevBench on an L4 (rerun separately: the run's own JevBench step failed on a path error in the
+Job script, before loading anything); **$8.86 in all**, inside the $15 budget.

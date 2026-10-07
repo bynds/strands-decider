@@ -61,4 +61,4 @@ The files are frozen and name the paths of the layout they were written in;
 | v19-calmix | Calibrating v19 on a broader held-out mix, no training | Rule failed on NLL. v19's temperatures stay. | [PREREGISTRATION-v19-calmix.md](preregistrations/PREREGISTRATION-v19-calmix.md) |
 | v19-seed1 | The seed replicate of v19 | Stopped at step 1,420. No results taken. | [PREREGISTRATION-v19-seed1.md](preregistrations/PREREGISTRATION-v19-seed1.md) |
 | v20 | Reading the question, and confidence | Four predictions failed (169 at the 4096 window). v19 stays the reference recipe. | [PREREGISTRATION-v20.md](preregistrations/PREREGISTRATION-v20.md) |
-| v22 | The recipe on Qwen3.5-0.8B-Base, for the Jibo port | Not yet run. | [PREREGISTRATION-v22.md](preregistrations/PREREGISTRATION-v22.md) |
+| v22 | The recipe on Qwen3.5-0.8B-Base, for the Jibo port | Met the port's bar: JevBench 156/231 at 4096 and at 512 (v21 176, 175), easy 48/48, ECE 0.054; predictions 3 (MuSiQue above range) and 6 (Brier 0.425) failed. | [PREREGISTRATION-v22.md](preregistrations/PREREGISTRATION-v22.md) |

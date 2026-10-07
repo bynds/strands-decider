@@ -7391,3 +7391,696 @@ decider-2b v11,hard-sol-c-multi_hop-13,1
 "Qwen3-1.7B, frozen",hard-sol-c-multi_hop-11,0
 "Qwen3-1.7B, frozen",hard-sol-c-multi_hop-12,0
 "Qwen3-1.7B, frozen",hard-sol-c-multi_hop-13,1
+v22,original-policy-01-0,1
+v22,original-policy-01-1,1
+v22,original-policy-02-0,0
+v22,original-policy-02-1,0
+v22,original-policy-03-0,0
+v22,original-policy-03-1,0
+v22,original-policy-04-0,0
+v22,original-policy-04-1,1
+v22,original-policy-05-0,1
+v22,original-policy-05-1,1
+v22,original-policy-06-0,1
+v22,original-policy-06-1,1
+v22,original-intent-01-0,1
+v22,original-intent-01-1,1
+v22,original-intent-02-0,0
+v22,original-intent-02-1,1
+v22,original-intent-03-0,1
+v22,original-intent-03-1,1
+v22,original-intent-04-0,1
+v22,original-intent-04-1,1
+v22,original-intent-05-0,1
+v22,original-intent-05-1,1
+v22,original-intent-06-0,1
+v22,original-intent-06-1,1
+v22,original-ordinal-01-0,1
+v22,original-ordinal-01-1,1
+v22,original-ordinal-02-0,1
+v22,original-ordinal-02-1,1
+v22,original-ordinal-03-0,1
+v22,original-ordinal-03-1,1
+v22,original-ordinal-04-0,1
+v22,original-ordinal-04-1,1
+v22,original-ordinal-05-0,0
+v22,original-ordinal-05-1,0
+v22,original-ordinal-06-0,1
+v22,original-ordinal-06-1,1
+v22,original-extraction-01-0,1
+v22,original-extraction-01-1,0
+v22,original-extraction-02-0,1
+v22,original-extraction-02-1,1
+v22,original-extraction-03-0,1
+v22,original-extraction-03-1,1
+v22,original-extraction-04-0,1
+v22,original-extraction-04-1,1
+v22,original-extraction-05-0,1
+v22,original-extraction-05-1,1
+v22,original-extraction-06-0,1
+v22,original-extraction-06-1,1
+v22,original-adequacy-01-0,1
+v22,original-adequacy-01-1,0
+v22,original-adequacy-02-0,0
+v22,original-adequacy-02-1,1
+v22,original-adequacy-03-0,0
+v22,original-adequacy-03-1,0
+v22,original-adequacy-04-0,1
+v22,original-adequacy-04-1,0
+v22,original-adequacy-05-0,0
+v22,original-adequacy-05-1,0
+v22,original-adequacy-06-0,1
+v22,original-adequacy-06-1,1
+v22,original-routing-01-0,1
+v22,original-routing-01-1,1
+v22,original-routing-02-0,1
+v22,original-routing-02-1,1
+v22,original-routing-03-0,1
+v22,original-routing-03-1,1
+v22,original-routing-04-0,1
+v22,original-routing-04-1,1
+v22,original-routing-05-0,1
+v22,original-routing-05-1,0
+v22,original-routing-06-0,1
+v22,original-routing-06-1,1
+v22,easy-intent-00,1
+v22,easy-intent-01,1
+v22,easy-intent-02,1
+v22,easy-intent-03,1
+v22,easy-intent-04,1
+v22,easy-intent-05,1
+v22,easy-intent-06,1
+v22,easy-intent-07,1
+v22,easy-intent-08,1
+v22,easy-intent-09,1
+v22,easy-intent-10,1
+v22,easy-intent-11,1
+v22,easy-fact-00,1
+v22,easy-fact-01,1
+v22,easy-fact-02,1
+v22,easy-fact-03,1
+v22,easy-fact-04,1
+v22,easy-fact-05,1
+v22,easy-fact-06,1
+v22,easy-fact-07,1
+v22,easy-fact-08,1
+v22,easy-fact-09,1
+v22,easy-fact-10,1
+v22,easy-fact-11,1
+v22,easy-extraction-00,1
+v22,easy-extraction-01,1
+v22,easy-extraction-02,1
+v22,easy-extraction-03,1
+v22,easy-extraction-04,1
+v22,easy-extraction-05,1
+v22,easy-extraction-06,1
+v22,easy-extraction-07,1
+v22,easy-extraction-08,1
+v22,easy-extraction-09,1
+v22,easy-extraction-10,1
+v22,easy-extraction-11,1
+v22,easy-tool_selection-00,1
+v22,easy-tool_selection-01,1
+v22,easy-tool_selection-02,1
+v22,easy-tool_selection-03,1
+v22,easy-tool_selection-04,1
+v22,easy-tool_selection-05,1
+v22,easy-tool_selection-06,1
+v22,easy-tool_selection-07,1
+v22,easy-tool_selection-08,1
+v22,easy-tool_selection-09,1
+v22,easy-tool_selection-10,1
+v22,easy-tool_selection-11,1
+v22,hard-opus-a-long_policy-01,1
+v22,hard-opus-a-long_policy-04,0
+v22,hard-opus-a-long_policy-08,1
+v22,hard-opus-a-long_policy-09,0
+v22,hard-opus-a-long_policy-11,1
+v22,hard-opus-a-long_policy-13,0
+v22,hard-opus-a-long_policy-17,0
+v22,hard-opus-a-long_policy-19,1
+v22,hard-opus-a-probability-03,1
+v22,hard-opus-a-probability-04,0
+v22,hard-opus-a-probability-07,0
+v22,hard-opus-a-probability-08,0
+v22,hard-opus-a-temporal_numeric-03,1
+v22,hard-opus-a-temporal_numeric-06,0
+v22,hard-opus-a-temporal_numeric-07,0
+v22,hard-opus-a-temporal_numeric-09,0
+v22,hard-opus-a-temporal_numeric-12,0
+v22,hard-opus-b-ambiguous-02,1
+v22,hard-opus-b-ambiguous-03,0
+v22,hard-opus-b-ambiguous-07,0
+v22,hard-opus-b-ambiguous-09,0
+v22,hard-opus-b-ambiguous-10,0
+v22,hard-opus-b-ambiguous-11,1
+v22,hard-opus-b-ambiguous-13,0
+v22,hard-opus-b-multi_hop-03,0
+v22,hard-opus-b-multi_hop-04,0
+v22,hard-opus-b-multi_hop-05,1
+v22,hard-opus-b-multi_hop-07,0
+v22,hard-opus-b-multi_hop-08,0
+v22,hard-opus-b-probability-01,1
+v22,hard-opus-b-probability-02,1
+v22,hard-opus-b-probability-03,1
+v22,hard-opus-b-probability-04,0
+v22,hard-opus-b-probability-06,0
+v22,hard-opus-b-tradeoff-01,1
+v22,hard-opus-b-tradeoff-03,1
+v22,hard-opus-b-tradeoff-06,0
+v22,hard-opus-b-tradeoff-07,0
+v22,hard-opus-b-tradeoff-08,1
+v22,hard-opus-b-tradeoff-12,1
+v22,hard-opus-c-long_policy-02,1
+v22,hard-opus-c-long_policy-03,0
+v22,hard-opus-c-long_policy-04,1
+v22,hard-opus-c-long_policy-05,0
+v22,hard-opus-c-long_policy-08,0
+v22,hard-opus-c-long_policy-10,0
+v22,hard-opus-c-long_policy-11,0
+v22,hard-opus-c-probability-03,0
+v22,hard-opus-c-temporal_numeric-02,1
+v22,hard-opus-c-temporal_numeric-03,0
+v22,hard-opus-c-temporal_numeric-04,0
+v22,hard-opus-c-temporal_numeric-06,0
+v22,hard-opus-c-temporal_numeric-08,0
+v22,hard-opus-c-temporal_numeric-12,1
+v22,hard-sol-a-adversarial-01,0
+v22,hard-sol-a-adversarial-06,1
+v22,hard-sol-a-adversarial-07,0
+v22,hard-sol-a-adversarial-08,1
+v22,hard-sol-a-adversarial-09,1
+v22,hard-sol-a-adversarial-11,1
+v22,hard-sol-a-multi_hop-01,1
+v22,hard-sol-a-multi_hop-02,0
+v22,hard-sol-a-multi_hop-05,1
+v22,hard-sol-a-multi_hop-07,0
+v22,hard-sol-a-multi_hop-08,0
+v22,hard-sol-a-multi_hop-09,1
+v22,hard-sol-a-multi_hop-10,0
+v22,hard-sol-a-multi_hop-12,1
+v22,hard-sol-a-trap-02,1
+v22,hard-sol-a-trap-04,1
+v22,hard-sol-a-trap-05,1
+v22,hard-sol-a-trap-06,1
+v22,hard-sol-a-trap-08,0
+v22,hard-sol-a-trap-10,1
+v22,hard-sol-a-trap-13,1
+v22,hard-sol-a-trap-15,1
+v22,hard-sol-b-judge_hard-01,1
+v22,hard-sol-b-judge_hard-02,0
+v22,hard-sol-b-judge_hard-05,1
+v22,hard-sol-b-judge_hard-08,0
+v22,hard-sol-b-judge_hard-10,0
+v22,hard-sol-b-judge_hard-14,0
+v22,hard-sol-b-judge_hard-15,1
+v22,hard-sol-b-judge_hard-18,0
+v22,hard-sol-b-long_policy-01,0
+v22,hard-sol-b-long_policy-02,0
+v22,hard-sol-b-long_policy-05,0
+v22,hard-sol-b-long_policy-06,1
+v22,hard-sol-b-routing_hard-01,1
+v22,hard-sol-b-routing_hard-02,1
+v22,hard-sol-b-routing_hard-03,1
+v22,hard-sol-b-routing_hard-07,1
+v22,hard-sol-b-routing_hard-09,1
+v22,hard-sol-b-temporal_numeric-01,0
+v22,hard-sol-b-temporal_numeric-02,1
+v22,hard-sol-b-temporal_numeric-03,0
+v22,hard-sol-b-temporal_numeric-04,0
+v22,hard-sol-c-judge_hard-03,0
+v22,hard-sol-c-judge_hard-05,1
+v22,hard-sol-c-judge_hard-07,0
+v22,hard-sol-c-judge_hard-08,0
+v22,hard-sol-c-judge_hard-09,1
+v22,hard-sol-c-judge_hard-10,1
+v22,hard-sol-c-judge_hard-11,0
+v22,hard-sol-c-judge_hard-13,0
+v22,hard-sol-c-judge_hard-15,1
+v22,hard-sol-c-multi_hop-07,1
+v22,hard-sol-c-multi_hop-09,1
+v22,hard-sol-c-multi_hop-11,1
+v22,hard-sol-c-multi_hop-12,0
+v22,hard-sol-c-multi_hop-13,1
+v22 @512,original-policy-01-0,1
+v22 @512,original-policy-01-1,1
+v22 @512,original-policy-02-0,0
+v22 @512,original-policy-02-1,0
+v22 @512,original-policy-03-0,0
+v22 @512,original-policy-03-1,0
+v22 @512,original-policy-04-0,0
+v22 @512,original-policy-04-1,1
+v22 @512,original-policy-05-0,1
+v22 @512,original-policy-05-1,1
+v22 @512,original-policy-06-0,1
+v22 @512,original-policy-06-1,1
+v22 @512,original-intent-01-0,1
+v22 @512,original-intent-01-1,1
+v22 @512,original-intent-02-0,0
+v22 @512,original-intent-02-1,1
+v22 @512,original-intent-03-0,1
+v22 @512,original-intent-03-1,1
+v22 @512,original-intent-04-0,1
+v22 @512,original-intent-04-1,1
+v22 @512,original-intent-05-0,1
+v22 @512,original-intent-05-1,1
+v22 @512,original-intent-06-0,1
+v22 @512,original-intent-06-1,1
+v22 @512,original-ordinal-01-0,1
+v22 @512,original-ordinal-01-1,1
+v22 @512,original-ordinal-02-0,1
+v22 @512,original-ordinal-02-1,1
+v22 @512,original-ordinal-03-0,1
+v22 @512,original-ordinal-03-1,1
+v22 @512,original-ordinal-04-0,1
+v22 @512,original-ordinal-04-1,1
+v22 @512,original-ordinal-05-0,0
+v22 @512,original-ordinal-05-1,0
+v22 @512,original-ordinal-06-0,1
+v22 @512,original-ordinal-06-1,1
+v22 @512,original-extraction-01-0,1
+v22 @512,original-extraction-01-1,0
+v22 @512,original-extraction-02-0,1
+v22 @512,original-extraction-02-1,1
+v22 @512,original-extraction-03-0,1
+v22 @512,original-extraction-03-1,1
+v22 @512,original-extraction-04-0,1
+v22 @512,original-extraction-04-1,1
+v22 @512,original-extraction-05-0,1
+v22 @512,original-extraction-05-1,1
+v22 @512,original-extraction-06-0,1
+v22 @512,original-extraction-06-1,1
+v22 @512,original-adequacy-01-0,1
+v22 @512,original-adequacy-01-1,0
+v22 @512,original-adequacy-02-0,0
+v22 @512,original-adequacy-02-1,1
+v22 @512,original-adequacy-03-0,0
+v22 @512,original-adequacy-03-1,0
+v22 @512,original-adequacy-04-0,1
+v22 @512,original-adequacy-04-1,0
+v22 @512,original-adequacy-05-0,0
+v22 @512,original-adequacy-05-1,0
+v22 @512,original-adequacy-06-0,1
+v22 @512,original-adequacy-06-1,1
+v22 @512,original-routing-01-0,1
+v22 @512,original-routing-01-1,1
+v22 @512,original-routing-02-0,1
+v22 @512,original-routing-02-1,1
+v22 @512,original-routing-03-0,1
+v22 @512,original-routing-03-1,1
+v22 @512,original-routing-04-0,1
+v22 @512,original-routing-04-1,1
+v22 @512,original-routing-05-0,1
+v22 @512,original-routing-05-1,0
+v22 @512,original-routing-06-0,1
+v22 @512,original-routing-06-1,1
+v22 @512,easy-intent-00,1
+v22 @512,easy-intent-01,1
+v22 @512,easy-intent-02,1
+v22 @512,easy-intent-03,1
+v22 @512,easy-intent-04,1
+v22 @512,easy-intent-05,1
+v22 @512,easy-intent-06,1
+v22 @512,easy-intent-07,1
+v22 @512,easy-intent-08,1
+v22 @512,easy-intent-09,1
+v22 @512,easy-intent-10,1
+v22 @512,easy-intent-11,1
+v22 @512,easy-fact-00,1
+v22 @512,easy-fact-01,1
+v22 @512,easy-fact-02,1
+v22 @512,easy-fact-03,1
+v22 @512,easy-fact-04,1
+v22 @512,easy-fact-05,1
+v22 @512,easy-fact-06,1
+v22 @512,easy-fact-07,1
+v22 @512,easy-fact-08,1
+v22 @512,easy-fact-09,1
+v22 @512,easy-fact-10,1
+v22 @512,easy-fact-11,1
+v22 @512,easy-extraction-00,1
+v22 @512,easy-extraction-01,1
+v22 @512,easy-extraction-02,1
+v22 @512,easy-extraction-03,1
+v22 @512,easy-extraction-04,1
+v22 @512,easy-extraction-05,1
+v22 @512,easy-extraction-06,1
+v22 @512,easy-extraction-07,1
+v22 @512,easy-extraction-08,1
+v22 @512,easy-extraction-09,1
+v22 @512,easy-extraction-10,1
+v22 @512,easy-extraction-11,1
+v22 @512,easy-tool_selection-00,1
+v22 @512,easy-tool_selection-01,1
+v22 @512,easy-tool_selection-02,1
+v22 @512,easy-tool_selection-03,1
+v22 @512,easy-tool_selection-04,1
+v22 @512,easy-tool_selection-05,1
+v22 @512,easy-tool_selection-06,1
+v22 @512,easy-tool_selection-07,1
+v22 @512,easy-tool_selection-08,1
+v22 @512,easy-tool_selection-09,1
+v22 @512,easy-tool_selection-10,1
+v22 @512,easy-tool_selection-11,1
+v22 @512,hard-opus-a-long_policy-01,0
+v22 @512,hard-opus-a-long_policy-04,0
+v22 @512,hard-opus-a-long_policy-08,0
+v22 @512,hard-opus-a-long_policy-09,0
+v22 @512,hard-opus-a-long_policy-11,1
+v22 @512,hard-opus-a-long_policy-13,1
+v22 @512,hard-opus-a-long_policy-17,0
+v22 @512,hard-opus-a-long_policy-19,1
+v22 @512,hard-opus-a-probability-03,1
+v22 @512,hard-opus-a-probability-04,1
+v22 @512,hard-opus-a-probability-07,0
+v22 @512,hard-opus-a-probability-08,0
+v22 @512,hard-opus-a-temporal_numeric-03,1
+v22 @512,hard-opus-a-temporal_numeric-06,0
+v22 @512,hard-opus-a-temporal_numeric-07,0
+v22 @512,hard-opus-a-temporal_numeric-09,0
+v22 @512,hard-opus-a-temporal_numeric-12,1
+v22 @512,hard-opus-b-ambiguous-02,1
+v22 @512,hard-opus-b-ambiguous-03,0
+v22 @512,hard-opus-b-ambiguous-07,0
+v22 @512,hard-opus-b-ambiguous-09,1
+v22 @512,hard-opus-b-ambiguous-10,0
+v22 @512,hard-opus-b-ambiguous-11,1
+v22 @512,hard-opus-b-ambiguous-13,0
+v22 @512,hard-opus-b-multi_hop-03,0
+v22 @512,hard-opus-b-multi_hop-04,0
+v22 @512,hard-opus-b-multi_hop-05,1
+v22 @512,hard-opus-b-multi_hop-07,1
+v22 @512,hard-opus-b-multi_hop-08,0
+v22 @512,hard-opus-b-probability-01,1
+v22 @512,hard-opus-b-probability-02,1
+v22 @512,hard-opus-b-probability-03,1
+v22 @512,hard-opus-b-probability-04,0
+v22 @512,hard-opus-b-probability-06,1
+v22 @512,hard-opus-b-tradeoff-01,1
+v22 @512,hard-opus-b-tradeoff-03,1
+v22 @512,hard-opus-b-tradeoff-06,0
+v22 @512,hard-opus-b-tradeoff-07,1
+v22 @512,hard-opus-b-tradeoff-08,1
+v22 @512,hard-opus-b-tradeoff-12,1
+v22 @512,hard-opus-c-long_policy-02,1
+v22 @512,hard-opus-c-long_policy-03,0
+v22 @512,hard-opus-c-long_policy-04,1
+v22 @512,hard-opus-c-long_policy-05,0
+v22 @512,hard-opus-c-long_policy-08,1
+v22 @512,hard-opus-c-long_policy-10,0
+v22 @512,hard-opus-c-long_policy-11,1
+v22 @512,hard-opus-c-probability-03,0
+v22 @512,hard-opus-c-temporal_numeric-02,1
+v22 @512,hard-opus-c-temporal_numeric-03,0
+v22 @512,hard-opus-c-temporal_numeric-04,0
+v22 @512,hard-opus-c-temporal_numeric-06,0
+v22 @512,hard-opus-c-temporal_numeric-08,0
+v22 @512,hard-opus-c-temporal_numeric-12,1
+v22 @512,hard-sol-a-adversarial-01,0
+v22 @512,hard-sol-a-adversarial-06,1
+v22 @512,hard-sol-a-adversarial-07,0
+v22 @512,hard-sol-a-adversarial-08,1
+v22 @512,hard-sol-a-adversarial-09,1
+v22 @512,hard-sol-a-adversarial-11,1
+v22 @512,hard-sol-a-multi_hop-01,1
+v22 @512,hard-sol-a-multi_hop-02,0
+v22 @512,hard-sol-a-multi_hop-05,0
+v22 @512,hard-sol-a-multi_hop-07,0
+v22 @512,hard-sol-a-multi_hop-08,0
+v22 @512,hard-sol-a-multi_hop-09,0
+v22 @512,hard-sol-a-multi_hop-10,0
+v22 @512,hard-sol-a-multi_hop-12,0
+v22 @512,hard-sol-a-trap-02,1
+v22 @512,hard-sol-a-trap-04,1
+v22 @512,hard-sol-a-trap-05,1
+v22 @512,hard-sol-a-trap-06,1
+v22 @512,hard-sol-a-trap-08,0
+v22 @512,hard-sol-a-trap-10,1
+v22 @512,hard-sol-a-trap-13,1
+v22 @512,hard-sol-a-trap-15,1
+v22 @512,hard-sol-b-judge_hard-01,1
+v22 @512,hard-sol-b-judge_hard-02,0
+v22 @512,hard-sol-b-judge_hard-05,1
+v22 @512,hard-sol-b-judge_hard-08,0
+v22 @512,hard-sol-b-judge_hard-10,0
+v22 @512,hard-sol-b-judge_hard-14,0
+v22 @512,hard-sol-b-judge_hard-15,1
+v22 @512,hard-sol-b-judge_hard-18,0
+v22 @512,hard-sol-b-long_policy-01,0
+v22 @512,hard-sol-b-long_policy-02,0
+v22 @512,hard-sol-b-long_policy-05,0
+v22 @512,hard-sol-b-long_policy-06,0
+v22 @512,hard-sol-b-routing_hard-01,1
+v22 @512,hard-sol-b-routing_hard-02,1
+v22 @512,hard-sol-b-routing_hard-03,1
+v22 @512,hard-sol-b-routing_hard-07,1
+v22 @512,hard-sol-b-routing_hard-09,1
+v22 @512,hard-sol-b-temporal_numeric-01,0
+v22 @512,hard-sol-b-temporal_numeric-02,1
+v22 @512,hard-sol-b-temporal_numeric-03,0
+v22 @512,hard-sol-b-temporal_numeric-04,0
+v22 @512,hard-sol-c-judge_hard-03,0
+v22 @512,hard-sol-c-judge_hard-05,1
+v22 @512,hard-sol-c-judge_hard-07,0
+v22 @512,hard-sol-c-judge_hard-08,0
+v22 @512,hard-sol-c-judge_hard-09,1
+v22 @512,hard-sol-c-judge_hard-10,1
+v22 @512,hard-sol-c-judge_hard-11,0
+v22 @512,hard-sol-c-judge_hard-13,0
+v22 @512,hard-sol-c-judge_hard-15,1
+v22 @512,hard-sol-c-multi_hop-07,0
+v22 @512,hard-sol-c-multi_hop-09,0
+v22 @512,hard-sol-c-multi_hop-11,0
+v22 @512,hard-sol-c-multi_hop-12,0
+v22 @512,hard-sol-c-multi_hop-13,1
+v21 @512,original-policy-01-0,1
+v21 @512,original-policy-01-1,1
+v21 @512,original-policy-02-0,1
+v21 @512,original-policy-02-1,0
+v21 @512,original-policy-03-0,1
+v21 @512,original-policy-03-1,0
+v21 @512,original-policy-04-0,1
+v21 @512,original-policy-04-1,1
+v21 @512,original-policy-05-0,1
+v21 @512,original-policy-05-1,1
+v21 @512,original-policy-06-0,1
+v21 @512,original-policy-06-1,1
+v21 @512,original-intent-01-0,1
+v21 @512,original-intent-01-1,1
+v21 @512,original-intent-02-0,1
+v21 @512,original-intent-02-1,1
+v21 @512,original-intent-03-0,1
+v21 @512,original-intent-03-1,1
+v21 @512,original-intent-04-0,1
+v21 @512,original-intent-04-1,1
+v21 @512,original-intent-05-0,1
+v21 @512,original-intent-05-1,1
+v21 @512,original-intent-06-0,1
+v21 @512,original-intent-06-1,1
+v21 @512,original-ordinal-01-0,1
+v21 @512,original-ordinal-01-1,1
+v21 @512,original-ordinal-02-0,1
+v21 @512,original-ordinal-02-1,1
+v21 @512,original-ordinal-03-0,1
+v21 @512,original-ordinal-03-1,1
+v21 @512,original-ordinal-04-0,1
+v21 @512,original-ordinal-04-1,1
+v21 @512,original-ordinal-05-0,1
+v21 @512,original-ordinal-05-1,1
+v21 @512,original-ordinal-06-0,1
+v21 @512,original-ordinal-06-1,1
+v21 @512,original-extraction-01-0,1
+v21 @512,original-extraction-01-1,1
+v21 @512,original-extraction-02-0,1
+v21 @512,original-extraction-02-1,1
+v21 @512,original-extraction-03-0,1
+v21 @512,original-extraction-03-1,1
+v21 @512,original-extraction-04-0,1
+v21 @512,original-extraction-04-1,1
+v21 @512,original-extraction-05-0,1
+v21 @512,original-extraction-05-1,1
+v21 @512,original-extraction-06-0,1
+v21 @512,original-extraction-06-1,1
+v21 @512,original-adequacy-01-0,1
+v21 @512,original-adequacy-01-1,1
+v21 @512,original-adequacy-02-0,1
+v21 @512,original-adequacy-02-1,1
+v21 @512,original-adequacy-03-0,0
+v21 @512,original-adequacy-03-1,0
+v21 @512,original-adequacy-04-0,1
+v21 @512,original-adequacy-04-1,1
+v21 @512,original-adequacy-05-0,1
+v21 @512,original-adequacy-05-1,1
+v21 @512,original-adequacy-06-0,1
+v21 @512,original-adequacy-06-1,1
+v21 @512,original-routing-01-0,1
+v21 @512,original-routing-01-1,1
+v21 @512,original-routing-02-0,1
+v21 @512,original-routing-02-1,1
+v21 @512,original-routing-03-0,1
+v21 @512,original-routing-03-1,1
+v21 @512,original-routing-04-0,1
+v21 @512,original-routing-04-1,1
+v21 @512,original-routing-05-0,1
+v21 @512,original-routing-05-1,0
+v21 @512,original-routing-06-0,1
+v21 @512,original-routing-06-1,1
+v21 @512,easy-intent-00,1
+v21 @512,easy-intent-01,1
+v21 @512,easy-intent-02,1
+v21 @512,easy-intent-03,1
+v21 @512,easy-intent-04,1
+v21 @512,easy-intent-05,1
+v21 @512,easy-intent-06,1
+v21 @512,easy-intent-07,1
+v21 @512,easy-intent-08,1
+v21 @512,easy-intent-09,1
+v21 @512,easy-intent-10,1
+v21 @512,easy-intent-11,1
+v21 @512,easy-fact-00,1
+v21 @512,easy-fact-01,1
+v21 @512,easy-fact-02,1
+v21 @512,easy-fact-03,1
+v21 @512,easy-fact-04,1
+v21 @512,easy-fact-05,1
+v21 @512,easy-fact-06,1
+v21 @512,easy-fact-07,1
+v21 @512,easy-fact-08,1
+v21 @512,easy-fact-09,1
+v21 @512,easy-fact-10,1
+v21 @512,easy-fact-11,1
+v21 @512,easy-extraction-00,1
+v21 @512,easy-extraction-01,1
+v21 @512,easy-extraction-02,1
+v21 @512,easy-extraction-03,1
+v21 @512,easy-extraction-04,1
+v21 @512,easy-extraction-05,1
+v21 @512,easy-extraction-06,1
+v21 @512,easy-extraction-07,1
+v21 @512,easy-extraction-08,1
+v21 @512,easy-extraction-09,1
+v21 @512,easy-extraction-10,1
+v21 @512,easy-extraction-11,1
+v21 @512,easy-tool_selection-00,1
+v21 @512,easy-tool_selection-01,1
+v21 @512,easy-tool_selection-02,1
+v21 @512,easy-tool_selection-03,1
+v21 @512,easy-tool_selection-04,1
+v21 @512,easy-tool_selection-05,1
+v21 @512,easy-tool_selection-06,1
+v21 @512,easy-tool_selection-07,1
+v21 @512,easy-tool_selection-08,1
+v21 @512,easy-tool_selection-09,1
+v21 @512,easy-tool_selection-10,1
+v21 @512,easy-tool_selection-11,1
+v21 @512,hard-opus-a-long_policy-01,0
+v21 @512,hard-opus-a-long_policy-04,0
+v21 @512,hard-opus-a-long_policy-08,0
+v21 @512,hard-opus-a-long_policy-09,0
+v21 @512,hard-opus-a-long_policy-11,1
+v21 @512,hard-opus-a-long_policy-13,0
+v21 @512,hard-opus-a-long_policy-17,0
+v21 @512,hard-opus-a-long_policy-19,1
+v21 @512,hard-opus-a-probability-03,1
+v21 @512,hard-opus-a-probability-04,1
+v21 @512,hard-opus-a-probability-07,1
+v21 @512,hard-opus-a-probability-08,1
+v21 @512,hard-opus-a-temporal_numeric-03,0
+v21 @512,hard-opus-a-temporal_numeric-06,0
+v21 @512,hard-opus-a-temporal_numeric-07,1
+v21 @512,hard-opus-a-temporal_numeric-09,1
+v21 @512,hard-opus-a-temporal_numeric-12,1
+v21 @512,hard-opus-b-ambiguous-02,1
+v21 @512,hard-opus-b-ambiguous-03,1
+v21 @512,hard-opus-b-ambiguous-07,0
+v21 @512,hard-opus-b-ambiguous-09,0
+v21 @512,hard-opus-b-ambiguous-10,1
+v21 @512,hard-opus-b-ambiguous-11,1
+v21 @512,hard-opus-b-ambiguous-13,1
+v21 @512,hard-opus-b-multi_hop-03,0
+v21 @512,hard-opus-b-multi_hop-04,0
+v21 @512,hard-opus-b-multi_hop-05,1
+v21 @512,hard-opus-b-multi_hop-07,1
+v21 @512,hard-opus-b-multi_hop-08,1
+v21 @512,hard-opus-b-probability-01,1
+v21 @512,hard-opus-b-probability-02,0
+v21 @512,hard-opus-b-probability-03,0
+v21 @512,hard-opus-b-probability-04,0
+v21 @512,hard-opus-b-probability-06,1
+v21 @512,hard-opus-b-tradeoff-01,1
+v21 @512,hard-opus-b-tradeoff-03,1
+v21 @512,hard-opus-b-tradeoff-06,0
+v21 @512,hard-opus-b-tradeoff-07,1
+v21 @512,hard-opus-b-tradeoff-08,0
+v21 @512,hard-opus-b-tradeoff-12,1
+v21 @512,hard-opus-c-long_policy-02,1
+v21 @512,hard-opus-c-long_policy-03,0
+v21 @512,hard-opus-c-long_policy-04,1
+v21 @512,hard-opus-c-long_policy-05,0
+v21 @512,hard-opus-c-long_policy-08,1
+v21 @512,hard-opus-c-long_policy-10,1
+v21 @512,hard-opus-c-long_policy-11,0
+v21 @512,hard-opus-c-probability-03,0
+v21 @512,hard-opus-c-temporal_numeric-02,1
+v21 @512,hard-opus-c-temporal_numeric-03,0
+v21 @512,hard-opus-c-temporal_numeric-04,0
+v21 @512,hard-opus-c-temporal_numeric-06,0
+v21 @512,hard-opus-c-temporal_numeric-08,0
+v21 @512,hard-opus-c-temporal_numeric-12,1
+v21 @512,hard-sol-a-adversarial-01,0
+v21 @512,hard-sol-a-adversarial-06,1
+v21 @512,hard-sol-a-adversarial-07,1
+v21 @512,hard-sol-a-adversarial-08,1
+v21 @512,hard-sol-a-adversarial-09,1
+v21 @512,hard-sol-a-adversarial-11,1
+v21 @512,hard-sol-a-multi_hop-01,1
+v21 @512,hard-sol-a-multi_hop-02,0
+v21 @512,hard-sol-a-multi_hop-05,0
+v21 @512,hard-sol-a-multi_hop-07,0
+v21 @512,hard-sol-a-multi_hop-08,0
+v21 @512,hard-sol-a-multi_hop-09,0
+v21 @512,hard-sol-a-multi_hop-10,1
+v21 @512,hard-sol-a-multi_hop-12,0
+v21 @512,hard-sol-a-trap-02,1
+v21 @512,hard-sol-a-trap-04,1
+v21 @512,hard-sol-a-trap-05,1
+v21 @512,hard-sol-a-trap-06,1
+v21 @512,hard-sol-a-trap-08,1
+v21 @512,hard-sol-a-trap-10,1
+v21 @512,hard-sol-a-trap-13,1
+v21 @512,hard-sol-a-trap-15,1
+v21 @512,hard-sol-b-judge_hard-01,1
+v21 @512,hard-sol-b-judge_hard-02,0
+v21 @512,hard-sol-b-judge_hard-05,1
+v21 @512,hard-sol-b-judge_hard-08,0
+v21 @512,hard-sol-b-judge_hard-10,0
+v21 @512,hard-sol-b-judge_hard-14,1
+v21 @512,hard-sol-b-judge_hard-15,1
+v21 @512,hard-sol-b-judge_hard-18,0
+v21 @512,hard-sol-b-long_policy-01,0
+v21 @512,hard-sol-b-long_policy-02,0
+v21 @512,hard-sol-b-long_policy-05,0
+v21 @512,hard-sol-b-long_policy-06,0
+v21 @512,hard-sol-b-routing_hard-01,1
+v21 @512,hard-sol-b-routing_hard-02,1
+v21 @512,hard-sol-b-routing_hard-03,1
+v21 @512,hard-sol-b-routing_hard-07,1
+v21 @512,hard-sol-b-routing_hard-09,1
+v21 @512,hard-sol-b-temporal_numeric-01,0
+v21 @512,hard-sol-b-temporal_numeric-02,1
+v21 @512,hard-sol-b-temporal_numeric-03,1
+v21 @512,hard-sol-b-temporal_numeric-04,0
+v21 @512,hard-sol-c-judge_hard-03,0
+v21 @512,hard-sol-c-judge_hard-05,1
+v21 @512,hard-sol-c-judge_hard-07,0
+v21 @512,hard-sol-c-judge_hard-08,0
+v21 @512,hard-sol-c-judge_hard-09,1
+v21 @512,hard-sol-c-judge_hard-10,1
+v21 @512,hard-sol-c-judge_hard-11,1
+v21 @512,hard-sol-c-judge_hard-13,0
+v21 @512,hard-sol-c-judge_hard-15,1
+v21 @512,hard-sol-c-multi_hop-07,0
+v21 @512,hard-sol-c-multi_hop-09,0
+v21 @512,hard-sol-c-multi_hop-11,0
+v21 @512,hard-sol-c-multi_hop-12,0
+v21 @512,hard-sol-c-multi_hop-13,0
