@@ -151,8 +151,12 @@ All on x86 (this is not the robot), against v21:
   | --- | --- | --- | --- |
   | q4, rounded to nearest | 0.277 | 0.361 | 0.455 |
   | q4, GPTQ (128 training prompts) | 0.160 | 0.162 | 0.251 |
+  | q4, GPTQ, MLP down-projections q8 (+44 MB) | 0.141 | 0.150 | 0.249 |
+  | q8 (does not fit the memory ceiling) | 0.017 | 0.021 | 0.028 |
 
-  The 0.8B torso is more sensitive to 4 bits than the 2B; GPTQ more than halves the error.
+  The 0.8B torso is more sensitive to 4 bits than the 2B; GPTQ more than halves the error, and
+  8-bit down-projections buy little. Whether 0.16 matters is a question about answers, which the
+  v22 JevBench comparison answers.
 - **Memory, 0.8B at q4 (a stand-in decider on Qwen3.5-0.8B-Base: right shapes, meaningless
   answers):** 333 MB peak resident set for a three-question request with a 512-token window, on
   x86. At q8 it is 562 MB, over the 400 MB ceiling, so q4 is the format. The file is 795 MB, of
