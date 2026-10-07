@@ -1,9 +1,11 @@
 # Porting the decider to Jibo: design and plan
 
 This document designs a native port of the Strands Decider inference engine to the original
-Jibo robot, and plans the work in phases with exit criteria. It is a proposal. None of the
-runtime, tools or files it names exist yet, and no number in it was measured on a Jibo.
-Paths are relative to the repository root unless they are links.
+Jibo robot, and plans the work in phases with exit criteria. It was written before any of the
+work; [Status](#status) records what has been built and measured since, and
+[ports/jibo/README.md](../ports/jibo/README.md) is the working record. No number in this
+document was measured on a Jibo. Paths are relative to the repository root unless they are
+links.
 
 Source of the hardware facts: the owner's handoff of 7 October 2026 ("native inference and GPU
 acceleration on original Jibo"). Its observations of the robot are the authority for this
@@ -13,6 +15,7 @@ resource envelope, GPU bring-up order and deployment boundaries carry over uncha
 Needle-specific build and kernel plan (handoff sections 3 and 6) is replaced by the runtime
 below, and its ncnn alternative (section 7) does not apply.
 
+- [Status](#status)
 - [Summary](#summary)
 - [What runs today, and what has to move](#what-runs-today-and-what-has-to-move)
 - [The target](#the-target)
@@ -24,6 +27,34 @@ below, and its ncnn alternative (section 7) does not apply.
 - [Risks](#risks)
 - [Decisions](#decisions)
 - [Alternatives considered](#alternatives-considered)
+
+## Status
+
+Recorded on 7 October 2026. Everything below ran on x86 or under an ARM emulator, not on a Jibo.
+
+- **Phases 1 and 2 are done.** `ports/jibo/` holds the exporter and a C99 runtime. Against v21
+  in fp32, parity stage 1 passes: tokens and offsets identical to Hugging Face on 5,431 texts,
+  every layer within 3e-6 of torch, and on device_parity.py's 54 answers no answer changes and
+  every rounded response is byte-identical to the Python engine's. Prompts render identically to
+  prompting.py on all 231 JevBench requests, 35 of them with a structured state.
+- **Two departures from the design below.** The runtime vendors nothing: NFC and the regex
+  classes come from tables generated from the tokenizer's own regex engine, and a small JSON
+  reader replaces cJSON, which keeps no number's original text. Python's `json.dumps` rendering
+  of structured content needs that text. And the tokenizer pipeline is read from the tokenizer
+  as transformers loads it, because `Qwen2Tokenizer` substitutes its own split regex for the one
+  Qwen3.5's tokenizer.json declares; the runtime supports both.
+- **Memory (gate G1, half of it):** a 0.8B-shaped decider at q4 peaks at 333 MB resident with a
+  512-token window, inside the owner's 400 MB; at q8 it is 562 MB. The other half of G1,
+  accuracy at q4, is being measured.
+- **Phase 4, in part:** a stand-in cross-build (GCC 13 against Debian 8's glibc 2.19) passes the
+  ABI check, needing at most `GLIBC_2.17`, and the runtime's parity tests pass under qemu-arm
+  with the NEON kernels. The owner's `jibo-armcc` build and any robot run are still to come.
+- **Phases 5 and 6, the code:** `jibo-gl-probe` and `bench-op` exist and pass on Mesa's software
+  renderer. Their measurements need the robot.
+- **Phase 9 is running:** v22 (the recipe on Qwen3.5-0.8B-Base) is training on Hugging Face
+  Jobs under the $15 budget ([PREREGISTRATION-v22.md](../research/preregistrations/PREREGISTRATION-v22.md)).
+- **Phase 8, in part:** `jibo-decider serve` answers on a Unix socket with the governor's
+  temperature and memory checks; the Node client and the coexistence runs are not done.
 
 ## Summary
 
@@ -232,7 +263,8 @@ short states the saving is smaller, because each question carries its own option
   Parity tests and continuous integration run there, so most of the work needs no robot.
 - **Vendored, pinned dependencies:** `utf8proc` (MIT) for NFC normalisation and the Unicode
   categories the pre-tokenizer needs, and a small JSON parser (cJSON, MIT) for the socket
-  protocol. Both are C99. Licences are recorded in `THIRD_PARTY_NOTICES.md`.
+  protocol. Both are C99. Licences are recorded in `THIRD_PARTY_NOTICES.md`. *(Superseded: see
+  [Status](#status). The runtime generates its Unicode tables and has its own JSON reader.)*
 - `check-jibo-abi.sh` wraps the owner's existing checker. It also asserts that the binary is
   ELF32 ARM with the hard-float attribute and the expected loader, that `NEEDED` lists only
   libc, libm, libpthread, libdl and the loader, that no symbol version is above `GLIBC_2.21`,
