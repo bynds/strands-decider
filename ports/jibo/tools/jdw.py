@@ -61,7 +61,20 @@ def quantise(w: np.ndarray, dtype: int) -> bytes:
     g = w.reshape(rows, cols // QBLOCK, QBLOCK).astype(np.float32)
     amax = np.abs(g).max(axis=-1, keepdims=True)
     qmax = 127.0 if dtype == Q8 else 7.0
+    lo = -127.0 if dtype == Q8 else -8.0
+    # The scale of each block: amax / qmax shrunk by the factor (of a few) with the least squared
+    # error after rounding. Clipping the largest value a little can make every other step finer;
+    # it matters at 4 bits. The stored format is the same either way.
+    best_err = np.full(amax.shape, np.inf, dtype=np.float32)
     scale16 = (amax / qmax).astype(np.float16)
+    for f in ((1.0,) if dtype == Q8 else np.linspace(1.0, 0.8, 11)):
+        cand16 = (amax * f / qmax).astype(np.float16)
+        c = cand16.astype(np.float32)
+        ic = np.divide(1.0, c, out=np.zeros_like(c), where=c > 0)
+        err = ((np.clip(np.rint(g * ic), lo, qmax) * c - g) ** 2).sum(axis=-1, keepdims=True)
+        better = err < best_err
+        scale16 = np.where(better, cand16, scale16)
+        best_err = np.where(better, err, best_err)
     scale = scale16.astype(np.float32)
     inv = np.divide(1.0, scale, out=np.zeros_like(scale), where=scale > 0)
     if dtype == Q8:
