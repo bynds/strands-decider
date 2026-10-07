@@ -6,8 +6,8 @@ LDLIBS += -lm
 OUT ?= build
 
 RUNTIME = runtime/jd_unicode.c runtime/jd_tokenizer.c runtime/jd_kernels.c runtime/jd_model.c \
-          runtime/jd_engine.c runtime/vendor/cjson/cJSON.c
-HEADERS = $(wildcard runtime/*.h) runtime/vendor/cjson/cJSON.h
+          runtime/jd_engine.c runtime/jd_json.c
+HEADERS = $(wildcard runtime/*.h)
 
 all: $(OUT)/jibo-decider $(OUT)/tok_dump $(OUT)/fwd_dump $(OUT)/bench-op $(OUT)/jibo-gl-probe
 

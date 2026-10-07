@@ -8,7 +8,7 @@
 
 #include "jd_kernels.h"
 #include "jd_unicode.h"
-#include "vendor/cjson/cJSON.h"
+#include "jd_json.h"
 
 /* ---- strings ----------------------------------------------------------------------------- */
 
@@ -91,6 +91,17 @@ static char *py_collapse(const char *s) {
     }
   }
   return b.s;
+}
+
+static int put_jstr(sbuf *b, const char *s) {
+  size_t len = 0, cap = 64;
+  char *q = malloc(cap);
+  if (!q) return -1;
+  q[0] = 0;
+  q = jd_json_quote(q, &len, &cap, s);
+  int rc = q ? sb_put(b, q, len) : -1;
+  free(q);
+  return rc;
 }
 
 /* ---- rendering (prompting.py) ------------------------------------------------------------ */
@@ -406,18 +417,23 @@ void jd_request_free(jd_request *r) {
   memset(r, 0, sizeof(*r));
 }
 
-/* A Content value: only strings for now; structured content needs Python's json.dumps
- * formatting, which this runtime does not implement yet. */
-static char *content(const cJSON *v, int allow_null, char *err, size_t err_len, const char *what) {
-  if (cJSON_IsString(v)) {
-    size_t n;
-    char *s = jd_nfc(v->valuestring, strlen(v->valuestring), &n);
-    if (!s) snprintf(err, err_len, "%s is not valid UTF-8", what);
-    return s;
+/* A Content value (render_content): a string as given, an object or a list as Python's
+ * json.dumps(indent=2, ensure_ascii=False) writes it; NFC-normalised either way. */
+static char *content(const jd_json *v, int allow_null, char *err, size_t err_len, const char *what) {
+  char *text = NULL;
+  if (v && v->type == JD_JSTRING) text = v->str;
+  else if (v && (v->type == JD_JOBJECT || v->type == JD_JARRAY)) text = jd_json_dumps_py(v);
+  else if (allow_null && v && v->type == JD_JNULL) return NULL;
+  else {
+    snprintf(err, err_len, "%s must be a string, an object or a list", what);
+    return NULL;
   }
-  if (allow_null && cJSON_IsNull(v)) return NULL;
-  snprintf(err, err_len, "%s: only string content is supported by this runtime", what);
-  return NULL;
+  if (!text) { snprintf(err, err_len, "out of memory"); return NULL; }
+  size_t n;
+  char *s = jd_nfc(text, strlen(text), &n);
+  if (text != v->str) free(text);
+  if (!s) snprintf(err, err_len, "%s is not valid UTF-8", what);
+  return s;
 }
 
 #undef FAIL
@@ -425,40 +441,41 @@ static char *content(const cJSON *v, int allow_null, char *err, size_t err_len, 
 
 int jd_request_parse(const char *json, jd_request *r, char *err, size_t err_len) {
   memset(r, 0, sizeof(*r));
-  cJSON *root = cJSON_Parse(json);
-  if (!root || !cJSON_IsObject(root)) FAIL("request is not a JSON object");
-  const cJSON *state = cJSON_GetObjectItemCaseSensitive(root, "state");
-  const cJSON *qs = cJSON_GetObjectItemCaseSensitive(root, "questions");
-  const cJSON *images = cJSON_GetObjectItemCaseSensitive(root, "images");
+  jd_json *root = jd_json_parse(json, err, err_len);
+  if (!root) goto fail;
+  if (root->type != JD_JOBJECT) FAIL("request is not a JSON object");
+  const jd_json *state = jd_json_get(root, "state");
+  const jd_json *qs = jd_json_get(root, "questions");
+  const jd_json *images = jd_json_get(root, "images");
   if (!state) FAIL("state is required");
-  if (images && cJSON_GetArraySize(images) > 0) FAIL("this engine has no vision tower");
+  if (images && images->type == JD_JARRAY && images->n > 0) FAIL("this engine has no vision tower");
   if (!(r->state = content(state, 0, err, err_len, "state"))) goto fail;
-  if (!cJSON_IsObject(qs) || cJSON_GetArraySize(qs) < 1) FAIL("questions must be a non-empty object");
-  r->n_q = cJSON_GetArraySize(qs);
+  if (!qs || qs->type != JD_JOBJECT || qs->n < 1) FAIL("questions must be a non-empty object");
+  r->n_q = qs->n;
   r->q = calloc((size_t)r->n_q, sizeof(jd_question));
   if (!r->q) FAIL("out of memory");
-  int i = 0;
-  for (const cJSON *it = qs->child; it; it = it->next, i++) {
+  for (int i = 0; i < qs->n; i++) {
+    const jd_json *it = qs->items[i];
     jd_question *q = &r->q[i];
-    for (int k = 0; k < i; k++) if (strcmp(r->q[k].name, it->string) == 0) FAIL("duplicate question %s", it->string);
-    if (!(q->name = xstrdup(it->string))) FAIL("out of memory");
-    const cJSON *type = cJSON_GetObjectItemCaseSensitive(it, "type");
-    const cJSON *ins = cJSON_GetObjectItemCaseSensitive(it, "instructions");
-    const cJSON *crit = cJSON_GetObjectItemCaseSensitive(it, "criteria");
-    if (!cJSON_IsString(type)) FAIL("question %s has no type", q->name);
-    if (strcmp(type->valuestring, "noul") == 0) q->kind = JD_NOUL;
-    else if (strcmp(type->valuestring, "choice") == 0) q->kind = JD_CHOICE;
-    else if (strcmp(type->valuestring, "score") == 0) q->kind = JD_SCORE;
-    else FAIL("question %s: unknown type %s", q->name, type->valuestring);
+    if (!(q->name = xstrdup(qs->keys[i]))) FAIL("out of memory");
+    if (it->type != JD_JOBJECT) FAIL("question %s is not an object", q->name);
+    const jd_json *type = jd_json_get(it, "type");
+    const jd_json *ins = jd_json_get(it, "instructions");
+    const jd_json *crit = jd_json_get(it, "criteria");
+    if (!type || type->type != JD_JSTRING) FAIL("question %s has no type", q->name);
+    if (strcmp(type->str, "noul") == 0) q->kind = JD_NOUL;
+    else if (strcmp(type->str, "choice") == 0) q->kind = JD_CHOICE;
+    else if (strcmp(type->str, "score") == 0) q->kind = JD_SCORE;
+    else FAIL("question %s: unknown type %s", q->name, type->str);
     if (!ins) FAIL("question %s has no instructions", q->name);
     if (!(q->instructions = content(ins, 0, err, err_len, "instructions"))) goto fail;
     if (q->kind == JD_SCORE) {
-      if (!cJSON_IsArray(crit)) FAIL("score criteria must be a list");
-      q->n_opts = cJSON_GetArraySize(crit);
+      if (!crit || crit->type != JD_JARRAY) FAIL("score criteria must be a list");
+      q->n_opts = crit->n;
       if (q->n_opts < 2 || q->n_opts > 10) FAIL("score requires between 2 and 10 levels");
-    } else if (crit && !cJSON_IsNull(crit)) {
-      if (!cJSON_IsObject(crit)) FAIL("criteria must be an object");
-      q->n_opts = cJSON_GetArraySize(crit);
+    } else if (crit && crit->type != JD_JNULL) {
+      if (crit->type != JD_JOBJECT) FAIL("criteria must be an object");
+      q->n_opts = crit->n;
     } else if (q->kind == JD_CHOICE) {
       FAIL("choice requires criteria");
     }
@@ -466,28 +483,49 @@ int jd_request_parse(const char *json, jd_request *r, char *err, size_t err_len)
     q->opt_names = calloc((size_t)q->n_opts + 1, sizeof(char *));
     q->opt_descs = calloc((size_t)q->n_opts + 1, sizeof(char *));
     if (!q->opt_names || !q->opt_descs) FAIL("out of memory");
-    int k = 0;
-    for (const cJSON *o = crit ? crit->child : NULL; o && k < q->n_opts; o = o->next, k++) {
+    for (int k = 0; k < q->n_opts; k++) {
+      const jd_json *o = crit->items[k];
       if (q->kind == JD_SCORE) {
-        if (!cJSON_IsString(o)) FAIL("score levels must be strings");
+        if (o->type != JD_JSTRING) FAIL("score levels must be strings");
         if (!(q->opt_descs[k] = content(o, 0, err, err_len, "level"))) goto fail;
         continue;
       }
       size_t n;
-      if (!(q->opt_names[k] = jd_nfc(o->string, strlen(o->string), &n))) FAIL("option name is not valid UTF-8");
-      if (q->kind == JD_NOUL && strcmp(o->string, "true") && strcmp(o->string, "false"))
+      const char *key = crit->keys[k];
+      if (!(q->opt_names[k] = jd_nfc(key, strlen(key), &n))) FAIL("option name is not valid UTF-8");
+      if (q->kind == JD_NOUL && strcmp(key, "true") && strcmp(key, "false"))
         FAIL("noul criteria keys must be a subset of {'true', 'false'}");
       err[0] = 0;
       q->opt_descs[k] = content(o, 1, err, err_len, "option description");
       if (!q->opt_descs[k] && err[0]) goto fail;
     }
   }
-  cJSON_Delete(root);
+  jd_json_free(root);
   return 0;
 fail:
-  cJSON_Delete(root);
+  jd_json_free(root);
   jd_request_free(r);
   return -1;
+}
+
+char *jd_render_json(const jd_request *r) {
+  sbuf b = {0};
+  char *content = py_strip(r->state);
+  int bad = !content || sb_str(&b, "[") || sb_str(&b, "") ;
+  if (!bad) {
+    sbuf st = {0};
+    bad = sb_str(&st, "<state>\n") || sb_str(&st, content) || sb_str(&st, "\n</state>\n") || put_jstr(&b, st.s);
+    free(st.s);
+  }
+  free(content);
+  for (int i = 0; i < r->n_q && !bad; i++) {
+    rendered rq;
+    if (render_question(&r->q[i], &rq) != 0) { bad = 1; break; }
+    bad = sb_str(&b, ",") || put_jstr(&b, rq.text);
+    rendered_free(&rq);
+  }
+  if (bad || sb_str(&b, "]")) { free(b.s); return NULL; }
+  return b.s;
 }
 
 /* ---- responses --------------------------------------------------------------------------- */
@@ -500,15 +538,6 @@ static int put_num(sbuf *b, double x) {
   size_t n = strlen(tmp);
   while (n > 0 && tmp[n - 1] == '0' && tmp[n - 2] != '.') tmp[--n] = 0;
   return sb_str(b, tmp);
-}
-
-static int put_jstr(sbuf *b, const char *s) {
-  cJSON *tmp = cJSON_CreateString(s);
-  char *out = tmp ? cJSON_PrintUnformatted(tmp) : NULL;
-  int rc = out ? sb_str(b, out) : -1;
-  free(out);
-  cJSON_Delete(tmp);
-  return rc;
 }
 
 char *jd_response_json(const jd_request *r, const jd_answer *ans, long input_tokens, const char *model_name,

@@ -59,6 +59,10 @@ void jd_answer_free(jd_answer *a);
 int jd_request_parse(const char *json, jd_request *r, char *err, size_t err_len);
 void jd_request_free(jd_request *r);
 
+/* The prompt pieces as prompting.py renders them: the state block, then each question's text,
+ * as a JSON array of strings (for tests). malloc'd. */
+char *jd_render_json(const jd_request *r);
+
 /* The response JSON, as the Python server returns it (without latency_ms). malloc'd. */
 char *jd_response_json(const jd_request *r, const jd_answer *answers, long input_tokens,
                        const char *model_name, float ordinal_smoothing);

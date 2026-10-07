@@ -210,3 +210,23 @@ def test_c_tokenizer_matches(built):
     for text, line in zip(texts, res.stdout.decode().split("\n"), strict=False):
         ids = [int(x.split(":")[0]) for x in line.split()]
         assert ids == engine.tok(text, add_special_tokens=False)["input_ids"], text
+
+
+@pytest.mark.parametrize("body", [
+    '{"state": {"b": [1, 2.50, {"x": null}], "a": "q\\"\\\\\\t\\u00e9\\ud83d\\ude00", "n": -0, "f": 1e16,'
+    ' "g": 1.5e-05, "h": 12345678901234567890, "i": 1E2, "j": 0.1, "k": 123456789.125, "e": {}, "l": []},'
+    ' "questions": {"q": {"type": "choice", "instructions": ["do", {"it": true}],'
+    ' "criteria": {"a": {"k": 1.0, "k": 2}, "b": null, "c": "  spaced\\n  out  "}}}}',
+    '{"state": "  Caf\\u0065\\u0301 \\u3000\\u000b", "questions": {"n": {"type": "noul", "instructions": "x",'
+    ' "criteria": {"true": {"why": [3.0, -2.5e-07]}}}, "s": {"type": "score", "instructions": {"rate": 1},'
+    ' "criteria": [" low ", "\\thigh\\u2028"]}}}',
+])
+def test_c_renders_prompts_as_python_does(built, body):
+    import unicodedata
+
+    binary, _, _ = built
+    req = SystemOneRequest.model_validate_json(body)
+    want = [render_state(req.state)] + [render_question(q).text for q in req.questions.values()]
+    res = subprocess.run([*RUNNER, str(binary / "jibo-decider"), "render"], input=body.encode(),
+                         capture_output=True, check=True)
+    assert json.loads(res.stdout) == [unicodedata.normalize("NFC", w) for w in want]

@@ -20,6 +20,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -47,8 +48,10 @@ def main() -> int:
             break
         time.sleep(0.1)
 
+    lock = threading.Lock()  # the C service answers one request at a time; queue them here
+
     def ask(payload: bytes) -> bytes:
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+        with lock, socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
             s.connect(sock)
             s.sendall(payload)
             s.shutdown(socket.SHUT_WR)

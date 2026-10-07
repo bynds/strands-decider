@@ -2,6 +2,7 @@
  *
  *   jibo-decider ask   MODEL.jdw TOKENIZER.jdt [options] < request.json
  *   jibo-decider serve MODEL.jdw TOKENIZER.jdt --socket PATH [options]
+ *   jibo-decider render < request.json     (the rendered prompt pieces, for tests)
  *
  * `ask` reads one /v1/systemone request and prints the response, as `strands-decider serve` would
  * return it, with latency_ms. `serve` answers the same requests on a Unix socket, one per
@@ -213,6 +214,17 @@ static int serve(server *s, const char *path) {
 }
 
 int main(int argc, char **argv) {
+  if (argc == 2 && !strcmp(argv[1], "render")) { /* the rendered prompt pieces, for tests */
+    char *json = read_fd(0), err[512] = {0};
+    jd_request r;
+    if (!json || jd_request_parse(json, &r, err, sizeof(err)) != 0) { char *d = detail(err); puts(d ? d : ""); free(d); return 3; }
+    char *out = jd_render_json(&r);
+    if (out) puts(out);
+    free(out);
+    free(json);
+    jd_request_free(&r);
+    return out ? 0 : 1;
+  }
   int is_ask = argc >= 2 && !strcmp(argv[1], "ask"), is_serve = argc >= 2 && !strcmp(argv[1], "serve");
   if (argc < 4 || (!is_ask && !is_serve)) {
     fprintf(stderr, "usage: jibo-decider ask|serve MODEL.jdw TOKENIZER.jdt [options]\n");
