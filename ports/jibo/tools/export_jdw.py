@@ -1,12 +1,18 @@
 """Export a decider checkpoint for the C runtime: model.jdw, tokenizer.jdt and a manifest.
 
     python ports/jibo/tools/export_jdw.py CHECKPOINT OUT_DIR [--weights f32|q8|q4] [--embed f32|bf16]
+        [--gptq N [--calib-file FILE ...]]
 
 CHECKPOINT is anything StrandsDeciderModel.load accepts: a checkpoint directory or a Hub id.
 The torso is loaded in fp32, the LoRA adapter is merged in fp32 (W + alpha/r * B A), and then
 the layer matrices are written in the requested format. Norms, the small DeltaNet projections
 and the pointer head stay fp32. The embedding table is only ever looked up, never multiplied;
 bf16 stores it exactly, since it is not adapted and the base weights are bf16.
+
+With --gptq N, the q4 matrices are quantised with GPTQ (tools/gptq.py), calibrated on N
+prompts rendered from the calibration files (by default the training corpus's
+data/train_v5.jsonl, data/multistep_v14.jsonl and data/generated_v16p.jsonl, read in turn),
+each cut to its first 512 tokens. The format, and so the runtime, is the same.
 """
 
 from __future__ import annotations
@@ -20,11 +26,30 @@ import sys
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
-from jdt import build_jdt
-from jdw import tensors_from_model, write_jdw
+from gptq import calibration_hessians  # noqa: E402
+from jdt import build_jdt  # noqa: E402
+from jdw import tensors_from_model, write_jdw  # noqa: E402
 
-from strands_decider.modeling import StrandsDeciderModel, checkpoint_dir
+from strands_decider.data.format import read_jsonl  # noqa: E402
+from strands_decider.modeling import StrandsDeciderModel, checkpoint_dir  # noqa: E402
+from strands_decider.prompting import build_prompt  # noqa: E402
+
+DEFAULT_CALIB = ["data/train_v5.jsonl", "data/multistep_v14.jsonl", "data/generated_v16p.jsonl"]
+
+
+def calibration_prompts(model: StrandsDeciderModel, files: list[str], n: int, max_tokens: int = 512):
+    """n token sequences: rows spread evenly over each file in turn, rendered as the engine renders."""
+    per = max(1, n // len(files))
+    out: list[list[int]] = []
+    for path in files:
+        rows = list(read_jsonl(path))
+        step = max(1, len(rows) // per)
+        for ex in rows[::step][:per]:
+            prompt, _ = build_prompt(ex.state, ex.to_question())
+            out.append(model.tokenizer(prompt, add_special_tokens=True)["input_ids"][:max_tokens])
+    return out[:n]
 
 
 def sha256_file(path: str) -> str:
@@ -94,6 +119,8 @@ def main() -> None:
     ap.add_argument("out_dir")
     ap.add_argument("--weights", choices=["f32", "q8", "q4"], default="f32")
     ap.add_argument("--embed", choices=["f32", "bf16"], default="bf16")
+    ap.add_argument("--gptq", type=int, default=0, metavar="N", help="GPTQ q4 with N calibration prompts")
+    ap.add_argument("--calib-file", action="append", default=None)
     args = ap.parse_args()
     os.makedirs(args.out_dir, exist_ok=True)
     src = checkpoint_dir(args.checkpoint)
@@ -103,10 +130,17 @@ def main() -> None:
     with open(jdt_path, "wb") as fh:
         fh.write(build_jdt(model.tokenizer.backend_tokenizer.to_str()))
     meta = meta_for(model, args.checkpoint, args.weights)
+    hessians = None
+    if args.gptq and args.weights == "q4":
+        files = args.calib_file or [os.path.join(REPO, f) for f in DEFAULT_CALIB]
+        prompts = calibration_prompts(model, files, args.gptq)
+        hessians = {k: v.float() for k, v in calibration_hessians(model.torso, prompts).items()}
+        meta["gptq"] = f"{len(prompts)} prompts, {sum(map(len, prompts))} tokens, from " + ",".join(
+            os.path.relpath(f, REPO) for f in files)
     jdw_path = os.path.join(args.out_dir, "model.jdw")
     with torch.no_grad():
         jdw_sha = write_jdw(jdw_path, meta, tensors_from_model(
-            model.torso, model.head, model.config, args.weights, args.embed))
+            model.torso, model.head, model.config, args.weights, args.embed, hessians))
 
     sources = {}
     for root, _, files in os.walk(src, followlinks=True):

@@ -37,6 +37,7 @@ PORT = os.path.join(REPO, "ports", "jibo")
 sys.path.insert(0, os.path.join(PORT, "tools"))
 
 from export_jdw import load_merged, meta_for  # noqa: E402
+from gptq import calibration_hessians  # noqa: E402
 from jdt import build_jdt  # noqa: E402
 from jdw import dequantise, quantise, tensors_from_model, write_jdw  # noqa: E402
 
@@ -133,12 +134,17 @@ def built(tmp_path_factory):
 
     merged = load_merged(str(ckpt))
     exports = {}
-    for kind in ("f32", "q8"):
+    prompts = [merged.tokenizer(render_state(r.state) + render_question(q).text)["input_ids"]
+               for r in REQUESTS for q in r.questions.values()]
+    hessians = calibration_hessians(merged.torso, prompts)
+    for kind in ("f32", "q8", "q4", "q4-gptq"):
         d = tmp / kind
         d.mkdir()
+        k = kind.split("-")[0]
         with torch.no_grad():
-            write_jdw(str(d / "model.jdw"), meta_for(merged, str(ckpt), kind),
-                      tensors_from_model(merged.torso, merged.head, merged.config, kind, "f32"))
+            write_jdw(str(d / "model.jdw"), meta_for(merged, str(ckpt), k),
+                      tensors_from_model(merged.torso, merged.head, merged.config, k, "f32",
+                                         hessians if kind.endswith("gptq") else None))
         (d / "tokenizer.jdt").write_bytes(build_jdt(merged.tokenizer.backend_tokenizer.to_str()))
         exports[kind] = d
     engine = SystemOneEngine(StrandsDeciderModel.load(str(ckpt)), EngineConfig(device="cpu"))
@@ -183,12 +189,13 @@ def test_c_runtime_answers_as_torch_does(built, request_index, prefix_cache):
             assert g["choice"] == w["choice"]
 
 
-def test_quantised_weights_stay_close(built):
+@pytest.mark.parametrize(("kind", "tol"), [("q8", 0.02), ("q4", 0.2), ("q4-gptq", 0.2)])
+def test_quantised_weights_stay_close(built, kind, tol):
     binary, exports, _ = built
     _, f32 = _ask(binary / "jibo-decider", exports["f32"], REQUESTS[1])
-    _, q8 = _ask(binary / "jibo-decider", exports["q8"], REQUESTS[1])
-    worst = max(abs(q8[q][k] - f32[q][k]) for q in f32 for k in f32[q])
-    assert worst < 0.02
+    _, q = _ask(binary / "jibo-decider", exports[kind], REQUESTS[1])
+    worst = max(abs(q[name][k] - f32[name][k]) for name in f32 for k in f32[name])
+    assert worst < tol
 
 
 def test_quantisation_round_trips():

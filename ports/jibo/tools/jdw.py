@@ -27,6 +27,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import torch
+from gptq import SHARED_INPUT
 
 F32, BF16, Q8, Q4 = 0, 1, 3, 4
 QBLOCK = 32
@@ -112,10 +113,15 @@ def f32(name: str, t: torch.Tensor) -> Tensor:
     return Tensor(name, F32, tuple(t.shape), lambda: _np32(t).tobytes())
 
 
-def matrix(name: str, t: torch.Tensor, kind: str) -> Tensor:
+def _matrix(name: str, t: torch.Tensor, kind: str, hessian: torch.Tensor | None = None) -> Tensor:
     if kind == "f32":
         return f32(name, t)
     dt = MATRIX_DTYPES[kind]
+    if hessian is not None and dt == Q4:
+        from gptq import pack_q4, quantise_gptq
+
+        return Tensor(name, dt, tuple(t.shape),
+                      lambda: pack_q4(*quantise_gptq(_np32(t), hessian.numpy())))
     return Tensor(name, dt, tuple(t.shape), lambda: quantise(_np32(t), dt))
 
 
@@ -125,8 +131,15 @@ def bf16(name: str, t: torch.Tensor) -> Tensor:
 
 
 def tensors_from_model(model: torch.nn.Module, head: torch.nn.Module, cfg: object, kind: str,
-                       embed_kind: str) -> Iterable[Tensor]:
-    """The torso (LoRA already merged, fp32) and the pointer head, in runtime names."""
+                       embed_kind: str, hessians: dict[str, torch.Tensor] | None = None) -> Iterable[Tensor]:
+    """The torso (LoRA already merged, fp32) and the pointer head, in runtime names. With
+    `hessians` (gptq.calibration_hessians), q4 matrices are quantised with GPTQ."""
+    hs = hessians or {}
+
+    def matrix(name: str, t: torch.Tensor, kind: str) -> Tensor:
+        layer, short = name.split(".", 1)
+        return _matrix(name, t, kind, hs.get(f"{layer}.{SHARED_INPUT[short]}"))
+
     emb = model.embed_tokens.weight
     if embed_kind == "bf16":
         yield bf16("embed", emb)
