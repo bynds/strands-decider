@@ -65,7 +65,7 @@ def main() -> int:
             self.end_headers()
             self.wfile.write(body)
 
-        def do_GET(self) -> None:  # noqa: N802
+        def do_GET(self) -> None:
             if self.path != "/health":
                 self._send(404, b"{}")
                 return
@@ -74,7 +74,7 @@ def main() -> int:
                       "device": "cpu (jibo-decider)"})
             self._send(200, json.dumps(h).encode())
 
-        def do_POST(self) -> None:  # noqa: N802
+        def do_POST(self) -> None:
             if self.path != "/v1/systemone":
                 self._send(404, b"{}")
                 return
