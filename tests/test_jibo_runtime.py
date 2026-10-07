@@ -6,6 +6,11 @@ Qwen's split, trained here on the test prompts. The exporter writes model.jdw an
 the C runtime is compiled with the host compiler, and both engines answer the same requests:
 one question (the whole-prompt path) and several (the shared-prefix path). Skips without a C
 compiler. Nothing is downloaded.
+
+To run the same tests on emulated ARMv7, as the robot runs the code (NEON kernels included):
+
+    JIBO_CC=arm-linux-gnueabihf-gcc JIBO_CFLAGS="-O2 -march=armv7-a -mfpu=neon -mfloat-abi=hard" \
+    JIBO_RUNNER="qemu-arm -L /usr/arm-linux-gnueabihf" pytest tests/test_jibo_runtime.py
 """
 
 from __future__ import annotations
@@ -22,9 +27,10 @@ import torch
 transformers = pytest.importorskip("transformers")
 if not hasattr(transformers, "Qwen3_5TextConfig"):
     pytest.skip("this transformers has no Qwen3.5", allow_module_level=True)
-CC = shutil.which(os.environ.get("CC", "cc")) or shutil.which("gcc")
+CC = shutil.which(os.environ.get("JIBO_CC", os.environ.get("CC", "cc"))) or shutil.which("gcc")
 if CC is None or shutil.which("make") is None:
     pytest.skip("no C compiler", allow_module_level=True)
+RUNNER = os.environ.get("JIBO_RUNNER", "").split()
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 PORT = os.path.join(REPO, "ports", "jibo")
@@ -96,7 +102,10 @@ def _tokenizer():
 def built(tmp_path_factory):
     tmp = tmp_path_factory.mktemp("jibo")
     out = tmp / "build"
-    subprocess.run(["make", "-s", "-C", PORT, f"OUT={out}", f"CC={CC}"], check=True)
+    make = ["make", "-s", "-C", PORT, f"OUT={out}", f"CC={CC}"]
+    if os.environ.get("JIBO_CFLAGS"):
+        make.append(f"CFLAGS={os.environ['JIBO_CFLAGS']}")
+    subprocess.run(make, check=True)
     tok = _tokenizer()
     torch.manual_seed(0)
     base_cfg = transformers.Qwen3_5TextConfig(
@@ -137,7 +146,7 @@ def built(tmp_path_factory):
 
 
 def _ask(binary, export, request, *extra):
-    res = subprocess.run([str(binary), "ask", str(export / "model.jdw"), str(export / "tokenizer.jdt"),
+    res = subprocess.run([*RUNNER, str(binary), "ask", str(export / "model.jdw"), str(export / "tokenizer.jdt"),
                           "--raw", *extra], input=request.model_dump_json().encode(), capture_output=True,
                          check=True)
     lines = res.stdout.decode().strip().split("\n")
@@ -196,7 +205,7 @@ def test_c_tokenizer_matches(built):
     texts = ["Hello  world\n\n x", "don't I'LL", "naïve café 日本 ☕", "<|endoftext|>a", "1. x — y\n2. z",
              "   ", "\t\n\r\n", "a" * 300]
     payload = b"".join(struct.pack("<I", len(t.encode())) + t.encode() for t in texts)
-    res = subprocess.run([str(binary / "tok_dump"), str(exports["f32"] / "tokenizer.jdt")], input=payload,
+    res = subprocess.run([*RUNNER, str(binary / "tok_dump"), str(exports["f32"] / "tokenizer.jdt")], input=payload,
                          capture_output=True, check=True)
     for text, line in zip(texts, res.stdout.decode().split("\n"), strict=False):
         ids = [int(x.split(":")[0]) for x in line.split()]

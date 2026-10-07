@@ -1,8 +1,10 @@
 # v22: v21b's recipe (configs/experiments/v21b.yaml) on Qwen3.5-0.8B-Base, for the Jibo port
 # (docs/jibo-port.md): the 2B torso's 1.37B layer parameters do not fit the robot's memory.
 # Preregistration: research/preregistrations/PREREGISTRATION-v22.md. Only base_model and
-# output_dir differ from v21b; seed 5 is v21b's released seed. The FAST settings
-# (gradient_checkpointing off, precompute_frozen_kl on) change speed only and fit an 80 GB GPU.
+# output_dir differ from v21b, plus gradient_checkpointing (below); seed 5 is v21b's released
+# seed. precompute_frozen_kl stays on (speed only). Amended before training: with
+# checkpointing off, as v21b trained across 8 GPUs, one 80 GB A100 ran out of memory at step 40
+# to 60, so checkpointing is back on. It is exact: it changes memory and speed, not the result.
 # Retraining it from the repo:
 #   training/recipe.sh build fetch multistep generated adequacy distill
 #   TRAIN_CONFIG=configs/experiments/v22.yaml CKPT=checkpoints/hobson-0.8b-v22 \
@@ -43,7 +45,7 @@ head_lr: 0.001          # randomly-initialised head needs a bigger step
 weight_decay: 0.01
 warmup_ratio: 0.03
 max_grad_norm: 1.0
-gradient_checkpointing: false  # FAST (speed only)
+gradient_checkpointing: true   # v21b had false (FAST); one GPU needs it (see the header)
 
 shuffle_options: true   # the whole point -- do not turn this off
 group_by_length: true   # on: ~2k-token documents among ~250-token rows would otherwise

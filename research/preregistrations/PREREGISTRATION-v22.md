@@ -26,13 +26,19 @@ seed 5, one epoch of the same steps (`configs/experiments/v22.yaml`). Data from
 `data/SHA256SUMS` as every frozen-target run is.
 
 Hardware: one NVIDIA A100 80 GB on Hugging Face Jobs, with v21b's FAST settings (speed
-only). This is the first run off the RTX 3090 and the H100 hosts. Bf16 rounding differs
+only) except gradient checkpointing (see the amendment below). This is the first run off the RTX 3090 and the H100 hosts. Bf16 rounding differs
 between GPUs; that is noise, not a change of recipe.
 
 Budget: under $15 of Hugging Face credits for this run and its evaluation, at $2.50 an hour.
 The throughput of the first steps is read from the log; if it projects past the budget, the
 run is cancelled and reported here as not completed, with no results taken from it. The Job
 also has a hard timeout that keeps the worst case inside the budget.
+
+*Amended before training (2026-10-07): the first launch ran out of GPU memory between steps 40
+and 60. v21b's FAST settings turn gradient checkpointing off, which fit when the AWS runner split
+each micro-batch over 8 GPUs, but not on one A100 80 GB. Checkpointing is back on; it recomputes
+activations instead of storing them and changes no result. The failed launch cost about $1.10 of
+the budget. Nothing else changed.*
 
 ## Baselines
 
