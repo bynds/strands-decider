@@ -25,6 +25,7 @@ run it, and what has been measured. Paths are relative to this directory unless 
 | `tools/jibo-gl-probe.c` | the first GPU deliverable: a GL 4.3 compute context of its own, the limits, a checked dispatch, timings |
 | `tools/bench_op.c` | one matrix of a real model on the CPU and on the GPU, timed and compared |
 | `tools/jevbench_serve.py` | stands in for `strands-decider serve` so `evaluation/jevbench/jevbench.sh` scores the C runtime |
+| `client/decider-client.js` | a skill's client for `jibo-decider serve`: ES5, callbacks, the built-in `net` module only |
 | `scripts/robot-run.sh` | the robot-side steps (deploy, probe, bench, ask, status, cleanup), for the owner to run within the agreed scope |
 | `tests/` | parity against the Python engine: tokens (`tokenizer_parity.py`), every layer (`forward_parity.py`), whole responses (`engine_parity.py`); `tok_dump.c` and `fwd_dump.c` are their C helpers |
 | `scripts/build-jibo.sh`, `scripts/check-jibo-abi.sh` | the cross-build and the check that the result loads on the robot |
