@@ -143,6 +143,16 @@ All on x86 (this is not the robot), against v21:
   q8 passes parity stage 2 but does not fit the memory ceiling (below); plain q4 fits but loses
   calibration, which is why the exporter has GPTQ (`--gptq N`) and per-type 8-bit overrides
   (`--q8 down`).
+- **Quantisation, Qwen3.5-0.8B torso (the stand-in decider: real torso, random head), final
+  hidden state against the fp32 export on 24 held-out evaluation prompts (10,805 tokens),
+  relative error (`tests/quant_error.py`):**
+
+  | weights | all tokens | answer position | worst prompt |
+  | --- | --- | --- | --- |
+  | q4, rounded to nearest | 0.277 | 0.361 | 0.455 |
+  | q4, GPTQ (128 training prompts) | 0.160 | 0.162 | 0.251 |
+
+  The 0.8B torso is more sensitive to 4 bits than the 2B; GPTQ more than halves the error.
 - **Memory, 0.8B at q4 (a stand-in decider on Qwen3.5-0.8B-Base: right shapes, meaningless
   answers):** 333 MB peak resident set for a three-question request with a 512-token window, on
   x86. At q8 it is 562 MB, over the 400 MB ceiling, so q4 is the format. The file is 795 MB, of
