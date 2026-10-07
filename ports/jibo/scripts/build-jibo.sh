@@ -37,7 +37,6 @@ else
   exit 2
 fi
 
-make -s -C "$HERE" OUT="$OUT" CC="$CC" CFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" "$OUT/jibo-decider"
-# shellcheck disable=SC2086
-"$CC" -std=c99 $CFLAGS -Wall -Wextra -o "$OUT/jibo-gl-probe" "$HERE/tools/jibo-gl-probe.c" $LDFLAGS -ldl
-"$HERE/scripts/check-jibo-abi.sh" "$OUT/jibo-decider" "$OUT/jibo-gl-probe"
+make -s -C "$HERE" OUT="$OUT" CC="$CC" CFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" \
+  "$OUT/jibo-decider" "$OUT/jibo-gl-probe" "$OUT/bench-op"
+"$HERE/scripts/check-jibo-abi.sh" "$OUT/jibo-decider" "$OUT/jibo-gl-probe" "$OUT/bench-op"

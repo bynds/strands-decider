@@ -95,6 +95,8 @@ int jd_model_load(jd_model *m, const char *path) {
   memcpy(m->meta, p + 24, meta_len);
   m->meta[meta_len] = 0;
   size_t table = 24 + meta_len;
+  m->n_tensors = n_tensors;
+  m->table_off = table;
 
   jd_config *c = &m->c;
   if (meta_int(m, "vocab_size", &c->vocab) || meta_int(m, "hidden_size", &c->hidden) ||
@@ -158,6 +160,10 @@ int jd_model_load(jd_model *m, const char *path) {
 fail:
   jd_model_free(m);
   return -1;
+}
+
+int jd_model_find(const jd_model *m, const char *name, jd_tensor *out) {
+  return find_tensor(m->map, m->map_len, m->n_tensors, m->table_off, name, out);
 }
 
 void jd_model_free(jd_model *m) {

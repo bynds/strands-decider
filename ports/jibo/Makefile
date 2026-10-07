@@ -9,7 +9,7 @@ RUNTIME = runtime/jd_unicode.c runtime/jd_tokenizer.c runtime/jd_kernels.c runti
           runtime/jd_engine.c runtime/vendor/cjson/cJSON.c
 HEADERS = $(wildcard runtime/*.h) runtime/vendor/cjson/cJSON.h
 
-all: $(OUT)/jibo-decider $(OUT)/tok_dump $(OUT)/fwd_dump
+all: $(OUT)/jibo-decider $(OUT)/tok_dump $(OUT)/fwd_dump $(OUT)/bench-op $(OUT)/jibo-gl-probe
 
 $(OUT)/jibo-decider: runtime/main.c $(RUNTIME) $(HEADERS)
 	@mkdir -p $(OUT)
@@ -22,6 +22,14 @@ $(OUT)/tok_dump: tests/tok_dump.c runtime/jd_unicode.c runtime/jd_tokenizer.c $(
 $(OUT)/fwd_dump: tests/fwd_dump.c runtime/jd_model.c runtime/jd_kernels.c $(HEADERS)
 	@mkdir -p $(OUT)
 	$(CC) $(CFLAGS) -o $@ tests/fwd_dump.c runtime/jd_model.c runtime/jd_kernels.c $(LDFLAGS) $(LDLIBS)
+
+$(OUT)/bench-op: tools/bench_op.c runtime/jd_gl.c runtime/jd_model.c runtime/jd_kernels.c $(HEADERS)
+	@mkdir -p $(OUT)
+	$(CC) $(CFLAGS) -o $@ tools/bench_op.c runtime/jd_gl.c runtime/jd_model.c runtime/jd_kernels.c $(LDFLAGS) -ldl $(LDLIBS)
+
+$(OUT)/jibo-gl-probe: tools/jibo-gl-probe.c
+	@mkdir -p $(OUT)
+	$(CC) $(CFLAGS) -o $@ tools/jibo-gl-probe.c $(LDFLAGS) -ldl
 
 runtime/unicode_tables.h: tools/gen_unicode_tables.py
 	python tools/gen_unicode_tables.py > $@

@@ -45,6 +45,8 @@ typedef struct {
   jd_layer *layers;
   char *meta; /* the file's key=value lines, NUL-terminated */
   float *rope_inv_freq;
+  uint32_t n_tensors;
+  size_t table_off;
 } jd_model;
 
 /* Recurrent and attention state of one sequence. */
@@ -59,6 +61,7 @@ typedef struct {
 int jd_model_load(jd_model *m, const char *path);
 void jd_model_free(jd_model *m);
 const char *jd_model_meta(const jd_model *m, const char *key); /* NULL if absent; points into m->meta */
+int jd_model_find(const jd_model *m, const char *name, jd_tensor *out); /* 0, or -1 if absent */
 
 int jd_state_init(jd_state *s, const jd_model *m, int cap);
 void jd_state_free(jd_state *s, const jd_model *m);
