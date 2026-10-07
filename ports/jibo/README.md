@@ -58,10 +58,14 @@ need at most `GLIBC_2.17`.
 ## Export a checkpoint
 
 ```bash
-python tools/export_jdw.py StrandsAgents/strands-decider-2B-hobson-v21 out/v21-q4 --weights q4
+# the robot's export: v22, 4-bit GPTQ, 40 MB of 8-bit matrices chosen by sensitivity (~10 min on 4 cores)
+python tools/export_jdw.py neil-pozetroninc/strands-decider-0.8b-v22 out/v22-q4d40 \
+    --weights q4 --gptq 128 --q8-budget-mb 40
 ```
 
-`--weights f32` is for parity tests, `q8` and `q4` for the robot. The LoRA adapter is merged in
+The v22 checkpoint is private to the owner's Hugging Face account; a local copy of it works the
+same. `--weights f32` is for parity tests and as the reference for `tests/kl_eval.py`; `q4` is
+for the robot (`q8` does not fit the memory ceiling with the 0.8B). The LoRA adapter is merged in
 fp32 before rounding. The 4-bit scales are chosen per block of 32 to minimise squared error. The
 embedding table is stored bf16 (exact: it is not adapted) and only ever read row by row from the
 memory-mapped file. The tokenizer pipeline is taken from the tokenizer as transformers loads it,
@@ -120,7 +124,7 @@ The first runs, in order, once the scope is agreed:
 
 ## Measured so far
 
-All on x86 (this is not the robot), against v21:
+All on x86 (this is not the robot), against v21 unless marked v22:
 
 - **Tokenizer:** identical ids and byte offsets to Hugging Face on 5,431 texts, 2.7 million
   tokens: every prompt of the evaluation files (300 per file) and 3,000 adversarial strings
@@ -157,6 +161,29 @@ All on x86 (this is not the robot), against v21:
   The 0.8B torso is more sensitive to 4 bits than the 2B; GPTQ more than halves the error, and
   8-bit down-projections buy little. Whether 0.16 matters is a question about answers, which the
   v22 JevBench comparison answers.
+- **v22, the port's model (the recipe on Qwen3.5-0.8B-Base,
+  [PREREGISTRATION-v22.md](../../research/preregistrations/PREREGISTRATION-v22.md)):** the
+  quantised exports against its fp32 export on 90 held-out evaluation questions at the 512-token
+  window, one question per request (`tests/kl_eval.py`; KL(fp32 || q4) of the answer
+  distributions, mean and largest; agreement of the chosen answers):
+
+  | weights | KL mean | KL max | agreement | accuracy (fp32 0.578) | peak RSS |
+  | --- | --- | --- | --- | --- | --- |
+  | q4, rounded to nearest | 0.0203 | 0.164 | 0.922 | 0.533 | 333 MB |
+  | q4, GPTQ (128 training prompts) | 0.0088 | 0.100 | 0.922 | 0.556 | 334 MB |
+  | q4, GPTQ, 41 matrices q8 by sensitivity (`--q8-budget-mb 40`) | **0.0053** | 0.070 | **0.944** | 0.567 | **372 MB** |
+
+  The last is Unsloth's dynamic-quant idea on the exporter's terms: every matrix is GPTQ'd and
+  scored by its Hessian-weighted output error, and the 40 MB go where they remove the most error
+  per byte. They went to the attention value, key and output projections, the DeltaNet output
+  projections and the MLP up-projections of layers 0 to 5, the early-MLP and value-path
+  sensitivity the VBQ paper reports. It quarters plain q4's KL and fits the ceiling with 28 MB
+  to spare.
+- **JevBench through the C runtime, v22 dynamic q4, 512-token window:** 158 of 231 (easy 48,
+  standard 56, hard 54), against the torch engine's 156 for v22 at 512 on an L4 GPU: +8 / -6,
+  McNemar p = 0.79. ECE 0.074, Brier 0.415 (torch 0.045, 0.415). Quantisation costs nothing
+  measurable on the benchmark; v22 still meets the port's bar (150, 46 easy, ECE 0.10) as the
+  robot would run it.
 - **Memory, 0.8B at q4 (a stand-in decider on Qwen3.5-0.8B-Base: right shapes, meaningless
   answers):** 333 MB peak resident set for a three-question request with a 512-token window, on
   x86. At q8 it is 562 MB, over the 400 MB ceiling, so q4 is the format. The file is 795 MB, of
@@ -169,8 +196,8 @@ All on x86 (this is not the robot), against v21:
 
 ## Not done yet
 
-- The quantisation measurements (parity stages 2 and 3) and the 0.8B decider (Phase 9, training).
 - Everything on the robot (Phases 4 to 8; `scripts/robot-run.sh` has the steps), and the GL
   backend beyond the matmul, which waits for gate G2.
-- Rendering of every JevBench request is identical to Python's (231 of 231, 35 with a structured
-  state); the JevBench score of the C runtime itself waits for the v22 export.
+- The GL backend in the engine: when weights are uploaded to GL buffers, the mmap'd pages they
+  came from must be released (`madvise(MADV_DONTNEED)`), or the weights sit in RAM twice on the
+  Tegra's shared memory and the 372 MB becomes about 650.

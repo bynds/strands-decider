@@ -43,16 +43,23 @@ Recorded on 7 October 2026. Everything below ran on x86 or under an ARM emulator
   of structured content needs that text. And the tokenizer pipeline is read from the tokenizer
   as transformers loads it, because `Qwen2Tokenizer` substitutes its own split regex for the one
   Qwen3.5's tokenizer.json declares; the runtime supports both.
-- **Memory (gate G1, half of it):** a 0.8B-shaped decider at q4 peaks at 333 MB resident with a
-  512-token window, inside the owner's 400 MB; at q8 it is 562 MB. The other half of G1,
-  accuracy at q4, is being measured.
+- **Gate G1 passes on x86.** v22 exported at 4 bits with GPTQ and 40 MB of 8-bit matrices chosen
+  by sensitivity (Unsloth's dynamic-quant allocation, scored by each matrix's Hessian-weighted
+  error) peaks at 372 MB resident with a 512-token window, inside the owner's 400 MB. Through the
+  C runtime it scores 158 of 231 on JevBench at 512, against 156 for the torch engine (McNemar
+  p = 0.79), ECE 0.074. Against its own fp32 export on held-out questions its answer
+  distributions differ by a mean KL of 0.0053 (plain 4-bit rounding: 0.020). The GPU path must
+  release the weights' CPU pages after upload to stay inside the ceiling.
 - **Phase 4, in part:** a stand-in cross-build (GCC 13 against Debian 8's glibc 2.19) passes the
   ABI check, needing at most `GLIBC_2.17`, and the runtime's parity tests pass under qemu-arm
   with the NEON kernels. The owner's `jibo-armcc` build and any robot run are still to come.
 - **Phases 5 and 6, the code:** `jibo-gl-probe` and `bench-op` exist and pass on Mesa's software
   renderer. Their measurements need the robot.
-- **Phase 9 is running:** v22 (the recipe on Qwen3.5-0.8B-Base) is training on Hugging Face
-  Jobs under the $15 budget ([PREREGISTRATION-v22.md](../research/preregistrations/PREREGISTRATION-v22.md)).
+- **Phase 9 is done:** v22, the recipe on Qwen3.5-0.8B-Base, met the bar fixed before training
+  ([PREREGISTRATION-v22.md](../research/preregistrations/PREREGISTRATION-v22.md)): 156 of 231 on
+  JevBench at 4096 and at 512 (v21: 176, 175), easy 48 of 48, ECE 0.054. Hugging Face cost
+  $8.86 of the $15 budget. The checkpoint is private on the owner's account,
+  `neil-pozetroninc/strands-decider-0.8b-v22`.
 - **Phase 8, in part:** `jibo-decider serve` answers on a Unix socket with the governor's
   temperature and memory checks; the Node client and the coexistence runs are not done.
 
