@@ -338,21 +338,56 @@ static void gated_deltanet(const jd_model *m, const jd_layer *L, int li, jd_stat
       float g = -expf(a_log[hv]) * softplusf(ab[(size_t)t * 2 * nv + nv + hv] + dt_bias[hv]);
       float decay = expf(g);
       float *Sh = S + (size_t)hv * dk * dv;
-      for (int j = 0; j < dv; j++) kv_mem[j] = 0.0f;
-      for (int i = 0; i < dk; i++) {
-        float *Si = Sh + (size_t)i * dv;
-        for (int j = 0; j < dv; j++) {
-          Si[j] *= decay;
-          kv_mem[j] += Si[j] * kn[i];
+      if (dv % 8 == 0) {
+        /* The two sweeps over the state below, eight columns at a time, with the columns'
+         * running sums in named registers instead of memory: each kv_mem[j] and o[j] still adds
+         * its terms over i in the same order. */
+        for (int jb = 0; jb < dv; jb += 8) {
+          float k0 = 0, k1 = 0, k2 = 0, k3 = 0, k4 = 0, k5 = 0, k6 = 0, k7 = 0;
+          for (int i = 0; i < dk; i++) {
+            float *Si = Sh + (size_t)i * dv + jb, kni = kn[i];
+            float s0 = Si[0] * decay, s1 = Si[1] * decay, s2 = Si[2] * decay, s3 = Si[3] * decay;
+            float s4 = Si[4] * decay, s5 = Si[5] * decay, s6 = Si[6] * decay, s7 = Si[7] * decay;
+            Si[0] = s0; Si[1] = s1; Si[2] = s2; Si[3] = s3; Si[4] = s4; Si[5] = s5; Si[6] = s6; Si[7] = s7;
+            k0 += s0 * kni; k1 += s1 * kni; k2 += s2 * kni; k3 += s3 * kni;
+            k4 += s4 * kni; k5 += s5 * kni; k6 += s6 * kni; k7 += s7 * kni;
+          }
+          kv_mem[jb] = k0; kv_mem[jb + 1] = k1; kv_mem[jb + 2] = k2; kv_mem[jb + 3] = k3;
+          kv_mem[jb + 4] = k4; kv_mem[jb + 5] = k5; kv_mem[jb + 6] = k6; kv_mem[jb + 7] = k7;
         }
-      }
-      for (int j = 0; j < dv; j++) kv_mem[j] = (v[j] - kv_mem[j]) * beta; /* delta */
-      for (int j = 0; j < dv; j++) o[j] = 0.0f;
-      for (int i = 0; i < dk; i++) {
-        float *Si = Sh + (size_t)i * dv;
-        for (int j = 0; j < dv; j++) {
-          Si[j] += kn[i] * kv_mem[j];
-          o[j] += Si[j] * qn[i];
+        for (int j = 0; j < dv; j++) kv_mem[j] = (v[j] - kv_mem[j]) * beta; /* delta */
+        for (int jb = 0; jb < dv; jb += 8) {
+          float c0 = kv_mem[jb], c1 = kv_mem[jb + 1], c2 = kv_mem[jb + 2], c3 = kv_mem[jb + 3];
+          float c4 = kv_mem[jb + 4], c5 = kv_mem[jb + 5], c6 = kv_mem[jb + 6], c7 = kv_mem[jb + 7];
+          float o0 = 0, o1 = 0, o2 = 0, o3 = 0, o4 = 0, o5 = 0, o6 = 0, o7 = 0;
+          for (int i = 0; i < dk; i++) {
+            float *Si = Sh + (size_t)i * dv + jb, kni = kn[i], qni = qn[i];
+            float s0 = Si[0] + kni * c0, s1 = Si[1] + kni * c1, s2 = Si[2] + kni * c2, s3 = Si[3] + kni * c3;
+            float s4 = Si[4] + kni * c4, s5 = Si[5] + kni * c5, s6 = Si[6] + kni * c6, s7 = Si[7] + kni * c7;
+            Si[0] = s0; Si[1] = s1; Si[2] = s2; Si[3] = s3; Si[4] = s4; Si[5] = s5; Si[6] = s6; Si[7] = s7;
+            o0 += s0 * qni; o1 += s1 * qni; o2 += s2 * qni; o3 += s3 * qni;
+            o4 += s4 * qni; o5 += s5 * qni; o6 += s6 * qni; o7 += s7 * qni;
+          }
+          o[jb] = o0; o[jb + 1] = o1; o[jb + 2] = o2; o[jb + 3] = o3;
+          o[jb + 4] = o4; o[jb + 5] = o5; o[jb + 6] = o6; o[jb + 7] = o7;
+        }
+      } else {
+        for (int j = 0; j < dv; j++) kv_mem[j] = 0.0f;
+        for (int i = 0; i < dk; i++) {
+          float *Si = Sh + (size_t)i * dv;
+          for (int j = 0; j < dv; j++) {
+            Si[j] *= decay;
+            kv_mem[j] += Si[j] * kn[i];
+          }
+        }
+        for (int j = 0; j < dv; j++) kv_mem[j] = (v[j] - kv_mem[j]) * beta; /* delta */
+        for (int j = 0; j < dv; j++) o[j] = 0.0f;
+        for (int i = 0; i < dk; i++) {
+          float *Si = Sh + (size_t)i * dv;
+          for (int j = 0; j < dv; j++) {
+            Si[j] += kn[i] * kv_mem[j];
+            o[j] += Si[j] * qn[i];
+          }
         }
       }
       /* gated RMSNorm over the head, then into the output row */

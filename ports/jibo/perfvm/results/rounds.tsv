@@ -3,3 +3,4 @@ r1-named-acc	plain dot: eight named accumulators instead of a lane array, which 
 r2-vfp-asm	plain dot: the inner loop in VFP assembly, two 8-register vldmia and eight vmla per 8 inputs
 r3-vfp-dot2	plain matmul: two tokens per pass, sharing the weight loads (three vldmia, sixteen vmla per 8 inputs)
 r4-neon-asm	NEON matmul tile (2 rows x 4 tokens) in assembly: post-increment 4-register vld1, sixteen vmla per 8 inputs
+r5-rec-interchange	DeltaNet recurrence: the state sweeps eight columns at a time, running sums in named registers

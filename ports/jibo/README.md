@@ -212,6 +212,7 @@ x86, ARM plain and ARM NEON. Plain is the shipped build (`-mfpu=vfpv3-d16`).
 | `r2-vfp-asm` | plain dot: the inner loop in VFP assembly, two 8-register vldmia and eight vmla per 8 inputs | 17.56 (-77%) | 11.54 (-76%) | 39.91 (-77%) | 11.46 (+0%) | 7.69 (+0%) | 26.58 (+0%) |
 | `r3-vfp-dot2` | plain matmul: two tokens per pass, sharing the weight loads (three vldmia, sixteen vmla per 8 inputs) | 15.99 (-79%) | 10.55 (-79%) | 36.45 (-79%) | 11.46 (+0%) | 7.69 (+0%) | 26.58 (+0%) |
 | `r4-neon-asm` | NEON matmul tile (2 rows x 4 tokens) in assembly: post-increment 4-register vld1, sixteen vmla per 8 inputs | 15.99 (-79%) | 10.55 (-79%) | 36.45 (-79%) | 7.28 (-36%) | 5.06 (-34%) | 17.46 (-34%) |
+| `r5-rec-interchange` | DeltaNet recurrence: the state sweeps eight columns at a time, running sums in named registers | 15.31 (-80%) | 10.12 (-79%) | 34.93 (-80%) | 6.75 (-41%) | 4.72 (-39%) | 16.28 (-39%) |
 
 ## Not done yet
 
