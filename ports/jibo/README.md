@@ -240,6 +240,35 @@ Per round, on the bench's four-layer model:
 | `r13-skip-unread` | the last layer skips the rows the pointer head never reads (one layer in four here, one in 24 in the real model) | 11.86 (-85%) | 8.90 (-82%) | 27.23 (-84%) | 4.49 (-61%) | 3.30 (-57%) | 10.59 (-60%) |
 | `r14-q8-asm` | plain q8 dequantisation in assembly: paired register moves, eight conversions and multiplies per store | 11.74 (-85%) | 8.76 (-82%) | 26.82 (-84%) | 4.49 (-61%) | 3.30 (-57%) | 10.59 (-60%) |
 
+## Against the Python engine
+
+Each build is bit-identical to its own golden (`perfvm/golden.sha256`), and the builds and the
+original Python engine (torch, fp32, LoRA unmerged) are compared with one another on the gate's
+traces (`perfvm/cross_check.py`, `perfvm/python_check.py`): every layer's hidden states over the
+109-token prompt, the final states, eight one-token continuations, and the unrounded answers of
+both fixture requests, with and without the prefix cache. Largest differences, after all the
+optimisations, hidden states relative to the largest activation:
+
+| model | build | hidden states vs Python | answers vs Python | vs x86 (hidden / answers) |
+| --- | --- | ---: | ---: | ---: |
+| v22 f32, 24 layers | x86 | 3.3e-6 | 2.4e-6 | |
+| | ARM plain | 2.8e-6 | 3.2e-6 | 9.8e-7 / 7.8e-7 |
+| | ARM NEON | 2.1e-6 | 2.6e-6 | 2.8e-6 / 5.4e-7 |
+| v22 f32, first 4 layers | x86 | 2.0e-6 | 1.7e-6 | |
+| | ARM plain | 2.2e-6 | 1.6e-6 | 8.3e-7 / 9.5e-7 |
+| | ARM NEON | 1.8e-6 | 2.2e-6 | 1.2e-6 / 1.4e-6 |
+
+Every choice and token count matches. The shipped dynamic-q4 export differs from Python by its
+quantisation, the same in all three builds (on the full model 1.5e-2 in the final states, and one
+answer near a coin flip in fp32, 0.40 / 0.60, comes out 0.53 / 0.47). On x86, the f32 export also
+matches the Python engine on `evaluation/device_parity.py`'s 54 answers (states up to 2,888
+tokens): no answer or token count changes, the rounded responses are identical, the largest
+unrounded difference is 5.0e-5.
+
+The gate runs the cross-build check on every model and the Python comparison on the four-layer f32
+model for all three builds (tolerances 1e-5 between builds; 1e-4 and 2e-5 against Python, with the
+same choices).
+
 ## Not done yet
 
 - Everything on the robot (Phases 4 to 8; `scripts/robot-run.sh` has the steps), and the GL
