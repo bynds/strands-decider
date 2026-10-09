@@ -8,3 +8,4 @@ r6-neon-dequant	NEON build: q4 and q8 rows dequantised sixteen weights per vecto
 r7-rec-asm	DeltaNet recurrence sweeps in VFP assembly (both builds): 8-register loads and stores per state row
 r8-q4-table	plain q4 dequantisation: a 16-value table per block, four weights per halfword in assembly
 r9-dot2-unroll	plain matmul kernel: sixteen inputs per loop iteration
+r10-attn-asm	attention in VFP assembly: two cached positions per score pass, weighted values with 8 columns in registers

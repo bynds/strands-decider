@@ -505,6 +505,95 @@ static void rope(const jd_model *m, float *x, int pos) {
   }
 }
 
+#if defined(__arm__) && defined(__ARM_FP)
+/* Attention in VFP assembly. attn_qk2: two scores, q.k0 and q.k1 over n (a multiple of 8)
+ * inputs, the query loaded once for both; each score is one accumulator adding q[i] k[i] in
+ * order of i, as the C loop does. attn_pv8: eight output columns o[0..8) += w[j] v_j[0..8) for
+ * j < np, where v_j = v + j * stride, positions two at a time; each column adds its terms in
+ * order of j. */
+static void attn_qk2(const float *q, const float *k0, const float *k1, int n, float *d) {
+  int c = n / 8;
+  __asm__ volatile(
+      "vldmia %[d], {s0-s1}\n\t"
+      "1:\n\t"
+      "vldmia %[q]!, {s16-s23}\n\t"
+      "vldmia %[k0]!, {s24-s31}\n\t"
+      "vmla.f32 s0, s16, s24\n\t"
+      "vmla.f32 s0, s17, s25\n\t"
+      "vmla.f32 s0, s18, s26\n\t"
+      "vmla.f32 s0, s19, s27\n\t"
+      "vmla.f32 s0, s20, s28\n\t"
+      "vmla.f32 s0, s21, s29\n\t"
+      "vmla.f32 s0, s22, s30\n\t"
+      "vmla.f32 s0, s23, s31\n\t"
+      "vldmia %[k1]!, {s24-s31}\n\t"
+      "vmla.f32 s1, s16, s24\n\t"
+      "vmla.f32 s1, s17, s25\n\t"
+      "vmla.f32 s1, s18, s26\n\t"
+      "vmla.f32 s1, s19, s27\n\t"
+      "vmla.f32 s1, s20, s28\n\t"
+      "vmla.f32 s1, s21, s29\n\t"
+      "vmla.f32 s1, s22, s30\n\t"
+      "vmla.f32 s1, s23, s31\n\t"
+      "subs %[c], %[c], #1\n\t"
+      "bne 1b\n\t"
+      "vstmia %[d], {s0-s1}"
+      : [q] "+r"(q), [k0] "+r"(k0), [k1] "+r"(k1), [c] "+r"(c)
+      : [d] "r"(d)
+      : "cc", "memory", "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13", "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26", "s27", "s28", "s29", "s30", "s31");
+}
+
+static void attn_pv8(const float *v, int stride, const float *w, int np, float *o) {
+  int pairs = np / 2, odd = np & 1;
+  __asm__ volatile(
+      "vldmia %[o], {s0-s7}\n\t"
+      "cmp %[pairs], #0\n\t"
+      "beq 2f\n\t"
+      "1:\n\t"
+      "vldmia %[w]!, {s8-s9}\n\t"
+      "vldmia %[v], {s16-s23}\n\t"
+      "add %[v], %[v], %[stride]\n\t"
+      "vldmia %[v], {s24-s31}\n\t"
+      "add %[v], %[v], %[stride]\n\t"
+      "vmla.f32 s0, s8, s16\n\t"
+      "vmla.f32 s1, s8, s17\n\t"
+      "vmla.f32 s2, s8, s18\n\t"
+      "vmla.f32 s3, s8, s19\n\t"
+      "vmla.f32 s4, s8, s20\n\t"
+      "vmla.f32 s5, s8, s21\n\t"
+      "vmla.f32 s6, s8, s22\n\t"
+      "vmla.f32 s7, s8, s23\n\t"
+      "vmla.f32 s0, s9, s24\n\t"
+      "vmla.f32 s1, s9, s25\n\t"
+      "vmla.f32 s2, s9, s26\n\t"
+      "vmla.f32 s3, s9, s27\n\t"
+      "vmla.f32 s4, s9, s28\n\t"
+      "vmla.f32 s5, s9, s29\n\t"
+      "vmla.f32 s6, s9, s30\n\t"
+      "vmla.f32 s7, s9, s31\n\t"
+      "subs %[pairs], %[pairs], #1\n\t"
+      "bne 1b\n\t"
+      "2:\n\t"
+      "cmp %[odd], #0\n\t"
+      "beq 3f\n\t"
+      "vldmia %[w]!, {s8}\n\t"
+      "vldmia %[v], {s16-s23}\n\t"
+      "vmla.f32 s0, s8, s16\n\t"
+      "vmla.f32 s1, s8, s17\n\t"
+      "vmla.f32 s2, s8, s18\n\t"
+      "vmla.f32 s3, s8, s19\n\t"
+      "vmla.f32 s4, s8, s20\n\t"
+      "vmla.f32 s5, s8, s21\n\t"
+      "vmla.f32 s6, s8, s22\n\t"
+      "vmla.f32 s7, s8, s23\n\t"
+      "3:\n\t"
+      "vstmia %[o], {s0-s7}"
+      : [v] "+r"(v), [w] "+r"(w), [pairs] "+r"(pairs)
+      : [o] "r"(o), [odd] "r"(odd), [stride] "r"(stride * 4)
+      : "cc", "memory", "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13", "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26", "s27", "s28", "s29", "s30", "s31");
+}
+#endif
+
 static void attention(const jd_model *m, const jd_layer *L, int li, jd_state *s, const float *h,
                       int n, float *out, scratch *sc) {
   const jd_config *c = &m->c;
@@ -546,23 +635,45 @@ static void attention(const jd_model *m, const jd_layer *L, int li, jd_state *s,
       const float *q = qg + (size_t)t * 2 * nh * hd + (size_t)hh * 2 * hd;
       int g = hh / rep;
       float mx = -INFINITY;
-      for (int j = 0; j <= last; j++) {
-        const float *k = kc + ((size_t)j * nkv + g) * hd;
-        float d = 0;
-        for (int i = 0; i < hd; i++) d += q[i] * k[i];
-        p[j] = d * scale;
-        if (p[j] > mx) mx = p[j];
-      }
+#if defined(__arm__) && defined(__ARM_FP)
+      if (hd % 8 == 0) {
+        for (int j = 0; j <= last; j += 2) {
+          const float *k0 = kc + ((size_t)j * nkv + g) * hd;
+          const float *k1 = j + 1 <= last ? k0 + (size_t)nkv * hd : k0;
+          float d[2] = {0, 0};
+          attn_qk2(q, k0, k1, hd, d);
+          p[j] = d[0] * scale;
+          if (p[j] > mx) mx = p[j];
+          if (j + 1 <= last) {
+            p[j + 1] = d[1] * scale;
+            if (p[j + 1] > mx) mx = p[j + 1];
+          }
+        }
+      } else
+#endif
+        for (int j = 0; j <= last; j++) {
+          const float *k = kc + ((size_t)j * nkv + g) * hd;
+          float d = 0;
+          for (int i = 0; i < hd; i++) d += q[i] * k[i];
+          p[j] = d * scale;
+          if (p[j] > mx) mx = p[j];
+        }
       float sum = 0;
       for (int j = 0; j <= last; j++) { p[j] = expf(p[j] - mx); sum += p[j]; }
       float inv = 1.0f / sum;
       float *o = att + ((size_t)t * nh + hh) * hd;
       for (int i = 0; i < hd; i++) o[i] = 0;
-      for (int j = 0; j <= last; j++) {
-        const float *v = vc + ((size_t)j * nkv + g) * hd;
-        float w = p[j] * inv;
-        for (int i = 0; i < hd; i++) o[i] += w * v[i];
-      }
+#if defined(__arm__) && defined(__ARM_FP)
+      if (hd % 8 == 0) {
+        for (int j = 0; j <= last; j++) p[j] = p[j] * inv; /* the weights, as below */
+        for (int i = 0; i < hd; i += 8) attn_pv8(vc + (size_t)g * hd + i, nkv * hd, p, last + 1, o + i);
+      } else
+#endif
+        for (int j = 0; j <= last; j++) {
+          const float *v = vc + ((size_t)j * nkv + g) * hd;
+          float w = p[j] * inv;
+          for (int i = 0; i < hd; i++) o[i] += w * v[i];
+        }
       const float *gate = qg + (size_t)t * 2 * nh * hd + (size_t)hh * 2 * hd + hd;
       for (int i = 0; i < hd; i++) o[i] *= sigmoidf_(gate[i]);
     }
