@@ -6,3 +6,4 @@ r4-neon-asm	NEON matmul tile (2 rows x 4 tokens) in assembly: post-increment 4-r
 r5-rec-interchange	DeltaNet recurrence: the state sweeps eight columns at a time, running sums in named registers
 r6-neon-dequant	NEON build: q4 and q8 rows dequantised sixteen weights per vector step
 r7-rec-asm	DeltaNet recurrence sweeps in VFP assembly (both builds): 8-register loads and stores per state row
+r8-q4-table	plain q4 dequantisation: a 16-value table per block, four weights per halfword in assembly

@@ -81,6 +81,58 @@ void jd_dequant_row(const jd_tensor *w, int row, float *dst) {
     }
   } else { /* JD_Q4 */
     const unsigned char *b = (const unsigned char *)w->data + (size_t)row * nb * 18;
+#if defined(__arm__) && defined(__ARM_FP)
+    /* Per block, the sixteen values s * (q - 8) once (the same products the loop below forms
+     * one weight at a time: a load of the levels, sixteen vmul, a store), then every weight a
+     * table copy: per two bytes, one halfword load, four field extracts, four indexed loads and
+     * two paired stores, 13 instructions for four weights where the loop below takes 34. */
+    static const float level[16] = {-8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7};
+    float lut[16];
+    float *d = dst;
+    for (int k = 0; k < nb; k++, b += 18) {
+      float s = jd_f16_to_f32((uint16_t)(b[0] | (b[1] << 8)));
+      const unsigned char *pb = b + 2;
+      int c = 8;
+      unsigned t, u0, u1, u2, u3;
+      __asm__ volatile(
+          "vldmia %[lev], {s16-s31}\n\t"
+          "vmul.f32 s16, s16, %[s]\n\t"
+          "vmul.f32 s17, s17, %[s]\n\t"
+          "vmul.f32 s18, s18, %[s]\n\t"
+          "vmul.f32 s19, s19, %[s]\n\t"
+          "vmul.f32 s20, s20, %[s]\n\t"
+          "vmul.f32 s21, s21, %[s]\n\t"
+          "vmul.f32 s22, s22, %[s]\n\t"
+          "vmul.f32 s23, s23, %[s]\n\t"
+          "vmul.f32 s24, s24, %[s]\n\t"
+          "vmul.f32 s25, s25, %[s]\n\t"
+          "vmul.f32 s26, s26, %[s]\n\t"
+          "vmul.f32 s27, s27, %[s]\n\t"
+          "vmul.f32 s28, s28, %[s]\n\t"
+          "vmul.f32 s29, s29, %[s]\n\t"
+          "vmul.f32 s30, s30, %[s]\n\t"
+          "vmul.f32 s31, s31, %[s]\n\t"
+          "vstmia %[lut], {s16-s31}\n\t"
+          "1:\n\t"
+          "ldrh %[t], [%[pb]], #2\n\t"
+          "ubfx %[u0], %[t], #0, #4\n\t"
+          "ubfx %[u1], %[t], #4, #4\n\t"
+          "ubfx %[u2], %[t], #8, #4\n\t"
+          "lsr %[u3], %[t], #12\n\t"
+          "ldr %[u0], [%[lut], %[u0], lsl #2]\n\t"
+          "ldr %[u1], [%[lut], %[u1], lsl #2]\n\t"
+          "ldr %[u2], [%[lut], %[u2], lsl #2]\n\t"
+          "ldr %[u3], [%[lut], %[u3], lsl #2]\n\t"
+          "strd %[u0], %[u1], [%[d]], #8\n\t"
+          "strd %[u2], %[u3], [%[d]], #8\n\t"
+          "subs %[c], %[c], #1\n\t"
+          "bne 1b"
+          : [pb] "+r"(pb), [d] "+r"(d), [c] "+r"(c), [t] "=&r"(t), [u0] "=&r"(u0), [u1] "=&r"(u1),
+            [u2] "=&r"(u2), [u3] "=&r"(u3)
+          : [lut] "r"(lut), [lev] "r"(level), [s] "t"(s)
+          : "cc", "memory", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26", "s27", "s28", "s29", "s30", "s31");
+    }
+#else
     for (int k = 0; k < nb; k++, b += 18) {
       float s = jd_f16_to_f32((uint16_t)(b[0] | (b[1] << 8)));
       for (int i = 0; i < 16; i++) {
@@ -88,6 +140,7 @@ void jd_dequant_row(const jd_tensor *w, int row, float *dst) {
         dst[k * 32 + 2 * i + 1] = s * (float)((int)(b[2 + i] >> 4) - 8);
       }
     }
+#endif
   }
 }
 
