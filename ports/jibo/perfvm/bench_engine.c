@@ -1,7 +1,9 @@
 /* bench_engine: the workloads perfvm/bench.sh counts, with per-operation spans (-DJD_PROFILE).
  *
- *   bench-engine MODEL.jdw TOKENIZER.jdt REQUEST1.json REQUEST3.json
+ *   bench-engine MODEL.jdw TOKENIZER.jdt REQUEST1.json REQUEST3.json [WORKLOAD]
  *
+ * WORKLOAD runs just one of them (the full model's prefill takes most of an hour to count at
+ * the start of the optimisation history).
  * One JSON line per workload: the clock's total over the workload and, per operation of
  * runtime/jd_prof.h, [clock, spans]; "other" is the total less the spans. The clock is the
  * instructions this process retires (perfvm/jd_icount.h) where the PMU allows, else nanoseconds.
@@ -74,8 +76,8 @@ static int evaluate(jd_engine *e, const char *path, const char *workload) {
 }
 
 int main(int argc, char **argv) {
-  if (argc != 5) {
-    fprintf(stderr, "usage: bench-engine MODEL.jdw TOKENIZER.jdt REQUEST1.json REQUEST3.json\n");
+  if (argc != 5 && argc != 6) {
+    fprintf(stderr, "usage: bench-engine MODEL.jdw TOKENIZER.jdt REQUEST1.json REQUEST3.json [WORKLOAD]\n");
     return 2;
   }
   clk = jd_icount_open() ? jd_icount_read : ns_clock;
@@ -87,7 +89,11 @@ int main(int argc, char **argv) {
   jd_engine_opts o = {0, 0, 1, 64};
   if (jd_engine_init(&e, &m, &tok, o) != 0) return 1;
 
-  if (evaluate(&e, argv[3], "prefill") || evaluate(&e, argv[4], "request3")) return 1;
+  const char *only = argc == 6 ? argv[5] : NULL;
+  if ((!only || !strcmp(only, "prefill")) && evaluate(&e, argv[3], "prefill")) return 1;
+  if (only && !strcmp(only, "prefill")) return 0;
+  if (evaluate(&e, argv[4], only && strcmp(only, "request3") ? NULL : "request3")) return 1;
+  if (only && strcmp(only, "prefix_hit")) return 0;
 
   /* prefix_hit: e.snap still holds REQUEST3's state prefix */
   char err[256];
