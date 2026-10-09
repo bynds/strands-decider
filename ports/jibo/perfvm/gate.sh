@@ -4,7 +4,10 @@
 # Builds tests/trace.c from this tree three ways (x86 as the host builds it, ARMv7 plain
 # VFPv3-D16 and ARMv7 NEON), runs each on the gate models (ARM under qemu-arm with the glibc 2.21
 # sysroot), and requires every trace to hash to perfvm/golden.sha256: the same bytes, layer by
-# layer, as the tree before any optimisation. x86 runs every model; the ARM builds run the two
+# layer, as the tree before any optimisation. Then the builds against one another
+# (cross_check.py: every hidden state and probability within 1e-5) and, when the checkpoint is
+# there, against the original Python engine (python_check.py, on the f32 four-layer model: within
+# 1e-4 of the largest activation and 2e-5 in probability, the same choices). x86 runs every model; the ARM builds run the two
 # four-layer ones (both layer types, q4, q8 and f32 matrices), since qemu-arm takes about an hour
 # per build for the 24-layer model; GATE_FULL_ARM=1 adds it. Then the runtime tests on x86 and under qemu-arm
 # (both FPUs), an AddressSanitizer + UBSan build of the trace on x86, and ruff.
@@ -15,6 +18,8 @@
 #   GATE_OUT       where traces and logs go (default $TMPDIR/perfvm/gate)
 #   GATE_RECORD=1  write golden.sha256 from this tree instead of checking against it
 #   GATE_SKIP_TESTS=1  traces and sanitizers only
+#   GATE_CHECKPOINT  the v22 checkpoint for the Python comparison (default: checkpoints/hobson-0.8b-v22
+#                  in the repository; skipped, and said so, when absent)
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/.." && pwd)
@@ -70,6 +75,18 @@ else
     echo "note: the sanitizer build's trace differs from the -O2 x86 build's (expected only if -O1 changes codegen)"
 fi
 echo "sanitizers: clean"
+
+python3 "$HERE/cross_check.py" "$OUT" > "$OUT/cross.log" || { cat "$OUT/cross.log"; fail "the builds disagree"; }
+echo "builds: x86, ARM plain and ARM NEON agree within 1e-5 on $(cut -c1-8 "$OUT/cross.log" | sort -u | wc -l) models"
+CKPT=${GATE_CHECKPOINT:-$REPO/checkpoints/hobson-0.8b-v22}
+if [ -d "$CKPT" ] && [ -f "$OUT/x86-f32-4.trace" ]; then
+  python3 "$HERE/python_check.py" "$CKPT" "$OUT/x86-f32-4.trace" "$OUT/plain-f32-4.trace" "$OUT/neon-f32-4.trace" \
+    --layers 4 --hidden-tol 1e-4 --prob-tol 2e-5 > "$OUT/python.log" 2>&1 ||
+    { grep "trace:" "$OUT/python.log" || tail -5 "$OUT/python.log"; fail "a build departs from the Python engine"; }
+  echo "python: all three builds match the Python engine (f32, four layers): $(grep -c 'trace:' "$OUT/python.log") traces"
+else
+  echo "python: skipped (no checkpoint at $CKPT)"
+fi
 
 if [ -z "${GATE_SKIP_TESTS:-}" ]; then
   (cd "$REPO" && python -m pytest -q tests/test_jibo_runtime.py) > "$OUT/pytest-x86.log" 2>&1 ||
