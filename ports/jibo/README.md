@@ -216,6 +216,7 @@ x86, ARM plain and ARM NEON. Plain is the shipped build (`-mfpu=vfpv3-d16`).
 | `r6-neon-dequant` | NEON build: q4 and q8 rows dequantised sixteen weights per vector step | 15.31 (-80%) | 10.12 (-79%) | 34.93 (-80%) | 5.76 (-50%) | 3.74 (-51%) | 13.32 (-50%) |
 | `r7-rec-asm` | DeltaNet recurrence sweeps in VFP assembly (both builds): 8-register loads and stores per state row | 15.01 (-81%) | 9.94 (-80%) | 34.28 (-80%) | 5.31 (-54%) | 3.46 (-55%) | 12.32 (-54%) |
 | `r8-q4-table` | plain q4 dequantisation: a 16-value table per block, four weights per halfword in assembly | 14.47 (-81%) | 9.39 (-81%) | 32.65 (-81%) | 5.31 (-54%) | 3.46 (-55%) | 12.32 (-54%) |
+| `r9-dot2-unroll` | plain matmul kernel: sixteen inputs per loop iteration | 13.93 (-82%) | 9.06 (-82%) | 31.47 (-82%) | 5.31 (-54%) | 3.46 (-55%) | 12.32 (-54%) |
 
 ## Not done yet
 

@@ -220,8 +220,13 @@ static void dot2(const float *x0, const float *x1, const float *w, int n, float 
   if (n >= 8) {
     const float *p0 = x0, *p1 = x1, *pw = w;
     int k = n / 8;
+    /* Sixteen inputs per iteration (the 8-input body twice), then a last 8 if n / 8 is odd:
+     * the loop's subs and bne once per 32 multiply-adds instead of per 16. */
+    int k16 = k / 2, odd = k & 1;
     __asm__ volatile(
         "vldmia %[acc], {s0-s15}\n\t"
+        "cmp %[k16], #0\n\t"
+        "beq 2f\n\t"
         "1:\n\t"
         "vldmia %[pw]!, {s16-s23}\n\t"
         "vldmia %[p0]!, {s24-s31}\n\t"
@@ -242,11 +247,53 @@ static void dot2(const float *x0, const float *x1, const float *w, int n, float 
         "vmla.f32 s13, s29, s21\n\t"
         "vmla.f32 s14, s30, s22\n\t"
         "vmla.f32 s15, s31, s23\n\t"
-        "subs %[k], %[k], #1\n\t"
+        "vldmia %[pw]!, {s16-s23}\n\t"
+        "vldmia %[p0]!, {s24-s31}\n\t"
+        "vmla.f32 s0, s24, s16\n\t"
+        "vmla.f32 s1, s25, s17\n\t"
+        "vmla.f32 s2, s26, s18\n\t"
+        "vmla.f32 s3, s27, s19\n\t"
+        "vmla.f32 s4, s28, s20\n\t"
+        "vmla.f32 s5, s29, s21\n\t"
+        "vmla.f32 s6, s30, s22\n\t"
+        "vmla.f32 s7, s31, s23\n\t"
+        "vldmia %[p1]!, {s24-s31}\n\t"
+        "vmla.f32 s8, s24, s16\n\t"
+        "vmla.f32 s9, s25, s17\n\t"
+        "vmla.f32 s10, s26, s18\n\t"
+        "vmla.f32 s11, s27, s19\n\t"
+        "vmla.f32 s12, s28, s20\n\t"
+        "vmla.f32 s13, s29, s21\n\t"
+        "vmla.f32 s14, s30, s22\n\t"
+        "vmla.f32 s15, s31, s23\n\t"
+        "subs %[k16], %[k16], #1\n\t"
         "bne 1b\n\t"
+        "2:\n\t"
+        "cmp %[odd], #0\n\t"
+        "beq 3f\n\t"
+        "vldmia %[pw]!, {s16-s23}\n\t"
+        "vldmia %[p0]!, {s24-s31}\n\t"
+        "vmla.f32 s0, s24, s16\n\t"
+        "vmla.f32 s1, s25, s17\n\t"
+        "vmla.f32 s2, s26, s18\n\t"
+        "vmla.f32 s3, s27, s19\n\t"
+        "vmla.f32 s4, s28, s20\n\t"
+        "vmla.f32 s5, s29, s21\n\t"
+        "vmla.f32 s6, s30, s22\n\t"
+        "vmla.f32 s7, s31, s23\n\t"
+        "vldmia %[p1]!, {s24-s31}\n\t"
+        "vmla.f32 s8, s24, s16\n\t"
+        "vmla.f32 s9, s25, s17\n\t"
+        "vmla.f32 s10, s26, s18\n\t"
+        "vmla.f32 s11, s27, s19\n\t"
+        "vmla.f32 s12, s28, s20\n\t"
+        "vmla.f32 s13, s29, s21\n\t"
+        "vmla.f32 s14, s30, s22\n\t"
+        "vmla.f32 s15, s31, s23\n\t"
+        "3:\n\t"
         "vstmia %[acc], {s0-s15}"
-        : [p0] "+r"(p0), [p1] "+r"(p1), [pw] "+r"(pw), [k] "+r"(k)
-        : [acc] "r"(acc)
+        : [p0] "+r"(p0), [p1] "+r"(p1), [pw] "+r"(pw), [k16] "+r"(k16)
+        : [acc] "r"(acc), [odd] "r"(odd)
         : "cc", "memory", "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13", "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26", "s27", "s28", "s29", "s30", "s31");
     i = n & ~7;
   }
