@@ -214,6 +214,7 @@ x86, ARM plain and ARM NEON. Plain is the shipped build (`-mfpu=vfpv3-d16`).
 | `r4-neon-asm` | NEON matmul tile (2 rows x 4 tokens) in assembly: post-increment 4-register vld1, sixteen vmla per 8 inputs | 15.99 (-79%) | 10.55 (-79%) | 36.45 (-79%) | 7.28 (-36%) | 5.06 (-34%) | 17.46 (-34%) |
 | `r5-rec-interchange` | DeltaNet recurrence: the state sweeps eight columns at a time, running sums in named registers | 15.31 (-80%) | 10.12 (-79%) | 34.93 (-80%) | 6.75 (-41%) | 4.72 (-39%) | 16.28 (-39%) |
 | `r6-neon-dequant` | NEON build: q4 and q8 rows dequantised sixteen weights per vector step | 15.31 (-80%) | 10.12 (-79%) | 34.93 (-80%) | 5.76 (-50%) | 3.74 (-51%) | 13.32 (-50%) |
+| `r7-rec-asm` | DeltaNet recurrence sweeps in VFP assembly (both builds): 8-register loads and stores per state row | 15.01 (-81%) | 9.94 (-80%) | 34.28 (-80%) | 5.31 (-54%) | 3.46 (-55%) | 12.32 (-54%) |
 
 ## Not done yet
 

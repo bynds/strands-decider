@@ -277,6 +277,83 @@ typedef struct {
   float *h, *mix, *big1, *big2, *small;
 } scratch;
 
+#if defined(__arm__) && defined(__ARM_FP)
+/* The two sweeps of the delta rule over eight state columns (rows of `stride` floats, `dk` of
+ * them), in VFP assembly for both ARM builds: per row, one 8-register load and store, eight vmul
+ * or vmla for the state and eight vmla for the sums. GCC's code takes 36 instructions a row,
+ * and with NEON enabled 43, bouncing the stores through the stack. The arithmetic, its operand
+ * order and the order of each column's sum are the C code's.
+ *
+ * rec_decay: S *= decay; k += S * kn[i]    (k[8] in and out)
+ * rec_update: S += kn[i] * c; o += S * qn[i] (c[8] in, o[8] in and out) */
+static void rec_decay(float *S, int stride, const float *kn, int dk, const float *decay, float *k) {
+  __asm__ volatile(
+      "vldmia %[k], {s0-s7}\n\t"
+      "vldr s16, [%[decay]]\n\t"
+      "1:\n\t"
+      "vldmia %[S], {s8-s15}\n\t"
+      "vldmia %[kn]!, {s17}\n\t"
+      "vmul.f32 s8, s8, s16\n\t"
+      "vmul.f32 s9, s9, s16\n\t"
+      "vmul.f32 s10, s10, s16\n\t"
+      "vmul.f32 s11, s11, s16\n\t"
+      "vmul.f32 s12, s12, s16\n\t"
+      "vmul.f32 s13, s13, s16\n\t"
+      "vmul.f32 s14, s14, s16\n\t"
+      "vmul.f32 s15, s15, s16\n\t"
+      "vstmia %[S], {s8-s15}\n\t"
+      "vmla.f32 s0, s8, s17\n\t"
+      "vmla.f32 s1, s9, s17\n\t"
+      "vmla.f32 s2, s10, s17\n\t"
+      "vmla.f32 s3, s11, s17\n\t"
+      "vmla.f32 s4, s12, s17\n\t"
+      "vmla.f32 s5, s13, s17\n\t"
+      "vmla.f32 s6, s14, s17\n\t"
+      "vmla.f32 s7, s15, s17\n\t"
+      "add %[S], %[S], %[stride]\n\t"
+      "subs %[n], %[n], #1\n\t"
+      "bne 1b\n\t"
+      "vstmia %[k], {s0-s7}"
+      : [S] "+r"(S), [kn] "+r"(kn), [n] "+r"(dk)
+      : [k] "r"(k), [decay] "r"(decay), [stride] "r"(stride * 4)
+      : "cc", "memory", "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13", "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26", "s27", "s28", "s29", "s30", "s31");
+}
+
+static void rec_update(float *S, int stride, const float *kn, const float *qn, int dk, const float *c, float *o) {
+  __asm__ volatile(
+      "vldmia %[o], {s0-s7}\n\t"
+      "vldmia %[c], {s18-s25}\n\t"
+      "1:\n\t"
+      "vldmia %[S], {s8-s15}\n\t"
+      "vldmia %[kn]!, {s16}\n\t"
+      "vldmia %[qn]!, {s17}\n\t"
+      "vmla.f32 s8, s16, s18\n\t"
+      "vmla.f32 s9, s16, s19\n\t"
+      "vmla.f32 s10, s16, s20\n\t"
+      "vmla.f32 s11, s16, s21\n\t"
+      "vmla.f32 s12, s16, s22\n\t"
+      "vmla.f32 s13, s16, s23\n\t"
+      "vmla.f32 s14, s16, s24\n\t"
+      "vmla.f32 s15, s16, s25\n\t"
+      "vstmia %[S], {s8-s15}\n\t"
+      "vmla.f32 s0, s8, s17\n\t"
+      "vmla.f32 s1, s9, s17\n\t"
+      "vmla.f32 s2, s10, s17\n\t"
+      "vmla.f32 s3, s11, s17\n\t"
+      "vmla.f32 s4, s12, s17\n\t"
+      "vmla.f32 s5, s13, s17\n\t"
+      "vmla.f32 s6, s14, s17\n\t"
+      "vmla.f32 s7, s15, s17\n\t"
+      "add %[S], %[S], %[stride]\n\t"
+      "subs %[n], %[n], #1\n\t"
+      "bne 1b\n\t"
+      "vstmia %[o], {s0-s7}"
+      : [S] "+r"(S), [kn] "+r"(kn), [qn] "+r"(qn), [n] "+r"(dk)
+      : [o] "r"(o), [c] "r"(c), [stride] "r"(stride * 4)
+      : "cc", "memory", "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13", "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26", "s27", "s28", "s29", "s30", "s31");
+}
+#endif
+
 static void gated_deltanet(const jd_model *m, const jd_layer *L, int li, jd_state *s, const float *h,
                            int n, float *out, scratch *sc) {
   const jd_config *c = &m->c;
@@ -343,6 +420,11 @@ static void gated_deltanet(const jd_model *m, const jd_layer *L, int li, jd_stat
          * running sums in named registers instead of memory: each kv_mem[j] and o[j] still adds
          * its terms over i in the same order. */
         for (int jb = 0; jb < dv; jb += 8) {
+#if defined(__arm__) && defined(__ARM_FP)
+          float kb[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+          rec_decay(Sh + jb, dv, kn, dk, &decay, kb);
+          memcpy(kv_mem + jb, kb, sizeof kb);
+#else
           float k0 = 0, k1 = 0, k2 = 0, k3 = 0, k4 = 0, k5 = 0, k6 = 0, k7 = 0;
           for (int i = 0; i < dk; i++) {
             float *Si = Sh + (size_t)i * dv + jb, kni = kn[i];
@@ -354,9 +436,15 @@ static void gated_deltanet(const jd_model *m, const jd_layer *L, int li, jd_stat
           }
           kv_mem[jb] = k0; kv_mem[jb + 1] = k1; kv_mem[jb + 2] = k2; kv_mem[jb + 3] = k3;
           kv_mem[jb + 4] = k4; kv_mem[jb + 5] = k5; kv_mem[jb + 6] = k6; kv_mem[jb + 7] = k7;
+#endif
         }
         for (int j = 0; j < dv; j++) kv_mem[j] = (v[j] - kv_mem[j]) * beta; /* delta */
         for (int jb = 0; jb < dv; jb += 8) {
+#if defined(__arm__) && defined(__ARM_FP)
+          float ob[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+          rec_update(Sh + jb, dv, kn, qn, dk, kv_mem + jb, ob);
+          memcpy(o + jb, ob, sizeof ob);
+#else
           float c0 = kv_mem[jb], c1 = kv_mem[jb + 1], c2 = kv_mem[jb + 2], c3 = kv_mem[jb + 3];
           float c4 = kv_mem[jb + 4], c5 = kv_mem[jb + 5], c6 = kv_mem[jb + 6], c7 = kv_mem[jb + 7];
           float o0 = 0, o1 = 0, o2 = 0, o3 = 0, o4 = 0, o5 = 0, o6 = 0, o7 = 0;
@@ -370,6 +458,7 @@ static void gated_deltanet(const jd_model *m, const jd_layer *L, int li, jd_stat
           }
           o[jb] = o0; o[jb + 1] = o1; o[jb + 2] = o2; o[jb + 3] = o3;
           o[jb + 4] = o4; o[jb + 5] = o5; o[jb + 6] = o6; o[jb + 7] = o7;
+#endif
         }
       } else {
         for (int j = 0; j < dv; j++) kv_mem[j] = 0.0f;
