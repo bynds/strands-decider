@@ -115,7 +115,7 @@ int jd_model_load(jd_model *m, const char *path) {
       meta_float(m, "temperature_score", &c->temp_score) ||
       meta_float(m, "ordinal_smoothing", &c->ordinal_smoothing))
     goto fail;
-  if (c->lin_nv % c->lin_nk || c->n_heads % c->n_kv || c->rot_dim % 2 || c->conv_k < 2) goto fail;
+  if (c->lin_nv % c->lin_nk || c->n_heads % c->n_kv || c->rot_dim % 2 || c->conv_k < 2 || c->conv_k > 8) goto fail;
   const char *types = jd_model_meta(m, "layer_types");
   if (!types) goto fail;
   m->layers = calloc((size_t)c->n_layers, sizeof(jd_layer));
@@ -375,14 +375,30 @@ static void gated_deltanet(const jd_model *m, const jd_layer *L, int li, jd_stat
   float *conv_out = sc->mix;                    /* n x cd (mix is n x max(H, cd)) */
   JD_PB(JD_P_LIN_CONV);
   for (int t = 0; t < n; t++) {
-    for (int ch = 0; ch < cd; ch++) {
-      float acc = 0.0f;
-      for (int j = 0; j < K; j++) {
-        int src = t - (K - 1) + j; /* index into mixed; negative reads the state */
-        float v = src >= 0 ? mixed[(size_t)src * cd + ch] : cs[(size_t)(K - 1 + src) * cd + ch];
-        acc += w[(size_t)ch * K + j] * v;
+    /* the K input rows of this step, resolved once instead of per channel and tap */
+    const float *r[8];
+    for (int j = 0; j < K; j++) {
+      int src = t - (K - 1) + j; /* index into mixed; negative reads the state */
+      r[j] = src >= 0 ? mixed + (size_t)src * cd : cs + (size_t)(K - 1 + src) * cd;
+    }
+    float *co = conv_out + (size_t)t * cd;
+    if (K == 4) {
+      const float *r0 = r[0], *r1 = r[1], *r2 = r[2], *r3 = r[3];
+      for (int ch = 0; ch < cd; ch++) {
+        const float *wc = w + (size_t)ch * 4;
+        float acc = 0.0f;
+        acc += wc[0] * r0[ch];
+        acc += wc[1] * r1[ch];
+        acc += wc[2] * r2[ch];
+        acc += wc[3] * r3[ch];
+        co[ch] = silu(acc);
       }
-      conv_out[(size_t)t * cd + ch] = silu(acc);
+    } else {
+      for (int ch = 0; ch < cd; ch++) {
+        float acc = 0.0f;
+        for (int j = 0; j < K; j++) acc += w[(size_t)ch * K + j] * r[j][ch];
+        co[ch] = silu(acc);
+      }
     }
   }
   /* new conv state: the last K-1 inputs of [state; mixed] */
