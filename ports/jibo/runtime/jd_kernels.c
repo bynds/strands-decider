@@ -31,6 +31,47 @@ void jd_dequant_row(const jd_tensor *w, int row, float *dst) {
     return;
   }
   int nb = in / 32;
+#ifdef JD_NEON
+  /* Sixteen or thirty-two weights per vector step instead of one. Bit for bit the scalar code
+   * below: the integers convert exactly, and a scale (an fp16 value, so at least 2^-24 in
+   * magnitude) times an integer from -128 to 127 is zero or a normal number, which NEON's
+   * flush-to-zero cannot touch. */
+  if (w->dtype == JD_Q4) {
+    const unsigned char *b = (const unsigned char *)w->data + (size_t)row * nb * 18;
+    const int8x16_t eight = vdupq_n_s8(8);
+    for (int k = 0; k < nb; k++, b += 18) {
+      float s = jd_f16_to_f32((uint16_t)(b[0] | (b[1] << 8)));
+      uint8x16_t q = vld1q_u8(b + 2);
+      uint8x16x2_t z = vzipq_u8(vandq_u8(q, vdupq_n_u8(15)), vshrq_n_u8(q, 4)); /* low nibble first */
+      float *d = dst + k * 32;
+      for (int h = 0; h < 2; h++, d += 16) {
+        int8x16_t v = vsubq_s8(vreinterpretq_s8_u8(z.val[h]), eight);
+        int16x8_t lo = vmovl_s8(vget_low_s8(v)), hi = vmovl_s8(vget_high_s8(v));
+        vst1q_f32(d, vmulq_n_f32(vcvtq_f32_s32(vmovl_s16(vget_low_s16(lo))), s));
+        vst1q_f32(d + 4, vmulq_n_f32(vcvtq_f32_s32(vmovl_s16(vget_high_s16(lo))), s));
+        vst1q_f32(d + 8, vmulq_n_f32(vcvtq_f32_s32(vmovl_s16(vget_low_s16(hi))), s));
+        vst1q_f32(d + 12, vmulq_n_f32(vcvtq_f32_s32(vmovl_s16(vget_high_s16(hi))), s));
+      }
+    }
+    return;
+  }
+  if (w->dtype == JD_Q8) {
+    const unsigned char *b = (const unsigned char *)w->data + (size_t)row * nb * 34;
+    for (int k = 0; k < nb; k++, b += 34) {
+      float s = jd_f16_to_f32((uint16_t)(b[0] | (b[1] << 8)));
+      float *d = dst + k * 32;
+      for (int h = 0; h < 2; h++, d += 16) {
+        int8x16_t v = vld1q_s8((const int8_t *)(b + 2 + 16 * h));
+        int16x8_t lo = vmovl_s8(vget_low_s8(v)), hi = vmovl_s8(vget_high_s8(v));
+        vst1q_f32(d, vmulq_n_f32(vcvtq_f32_s32(vmovl_s16(vget_low_s16(lo))), s));
+        vst1q_f32(d + 4, vmulq_n_f32(vcvtq_f32_s32(vmovl_s16(vget_high_s16(lo))), s));
+        vst1q_f32(d + 8, vmulq_n_f32(vcvtq_f32_s32(vmovl_s16(vget_low_s16(hi))), s));
+        vst1q_f32(d + 12, vmulq_n_f32(vcvtq_f32_s32(vmovl_s16(vget_high_s16(hi))), s));
+      }
+    }
+    return;
+  }
+#endif
   if (w->dtype == JD_Q8) {
     const unsigned char *b = (const unsigned char *)w->data + (size_t)row * nb * 34;
     for (int k = 0; k < nb; k++, b += 34) {
