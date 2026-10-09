@@ -219,6 +219,7 @@ x86, ARM plain and ARM NEON. Plain is the shipped build (`-mfpu=vfpv3-d16`).
 | `r9-dot2-unroll` | plain matmul kernel: sixteen inputs per loop iteration | 13.93 (-82%) | 9.06 (-82%) | 31.47 (-82%) | 5.31 (-54%) | 3.46 (-55%) | 12.32 (-54%) |
 | `r10-attn-asm` | attention in VFP assembly: two cached positions per score pass, weighted values with 8 columns in registers | 13.83 (-82%) | 8.97 (-82%) | 31.20 (-82%) | 5.21 (-55%) | 3.37 (-56%) | 12.05 (-55%) |
 | `r11-conv-rows` | DeltaNet convolution: the four input rows resolved once per step, no branch per channel and tap | 13.73 (-82%) | 8.90 (-82%) | 30.99 (-82%) | 5.11 (-55%) | 3.31 (-57%) | 11.84 (-55%) |
+| `r12-rope-once` | RoPE: cosines and sines once per position instead of once per head | 13.73 (-82%) | 8.90 (-82%) | 30.98 (-82%) | 5.11 (-55%) | 3.30 (-57%) | 11.83 (-55%) |
 
 ## Not done yet
 

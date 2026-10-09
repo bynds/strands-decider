@@ -115,7 +115,9 @@ int jd_model_load(jd_model *m, const char *path) {
       meta_float(m, "temperature_score", &c->temp_score) ||
       meta_float(m, "ordinal_smoothing", &c->ordinal_smoothing))
     goto fail;
-  if (c->lin_nv % c->lin_nk || c->n_heads % c->n_kv || c->rot_dim % 2 || c->conv_k < 2 || c->conv_k > 8) goto fail;
+  if (c->lin_nv % c->lin_nk || c->n_heads % c->n_kv || c->rot_dim % 2 || c->rot_dim > 256 || c->conv_k < 2 ||
+      c->conv_k > 8)
+    goto fail;
   const char *types = jd_model_meta(m, "layer_types");
   if (!types) goto fail;
   m->layers = calloc((size_t)c->n_layers, sizeof(jd_layer));
@@ -510,14 +512,22 @@ static void gated_deltanet(const jd_model *m, const jd_layer *L, int li, jd_stat
   JD_PE();
 }
 
-static void rope(const jd_model *m, float *x, int pos) {
+/* The rotary angles' cosines and sines at one position (half = rot_dim / 2 of each), computed once
+ * for all of its heads: libm's cosf and sinf cost about a hundred instructions a call. */
+static void rope_angles(const jd_model *m, int pos, float *cs, float *sn) {
+  for (int i = 0; i < m->c.rot_dim / 2; i++) {
+    float f = (float)pos * m->rope_inv_freq[i];
+    cs[i] = cosf(f);
+    sn[i] = sinf(f);
+  }
+}
+
+static void rope(const jd_model *m, float *x, const float *cs, const float *sn) {
   int half = m->c.rot_dim / 2;
   for (int i = 0; i < half; i++) {
-    float f = (float)pos * m->rope_inv_freq[i];
-    float cs = cosf(f), sn = sinf(f);
     float a = x[i], b = x[i + half];
-    x[i] = a * cs - b * sn;
-    x[i + half] = b * cs + a * sn;
+    x[i] = a * cs[i] - b * sn[i];
+    x[i + half] = b * cs[i] + a * sn[i];
   }
 }
 
@@ -624,18 +634,20 @@ static void attention(const jd_model *m, const jd_layer *L, int li, jd_state *s,
   const float *qnw = (const float *)L->q_norm.data, *knw = (const float *)L->k_norm.data;
   float *kc = s->kc[li], *vc = s->vc[li];
   JD_PB(JD_P_ATTN_ROPE);
+  float cs[128], sn[128]; /* rot_dim / 2 <= 128 (jd_model_load checks) */
   for (int t = 0; t < n; t++) {
     int pos = s->pos + t;
+    rope_angles(m, pos, cs, sn);
     for (int hh = 0; hh < nh; hh++) {
       float *q = qg + (size_t)t * 2 * nh * hd + (size_t)hh * 2 * hd;
       rmsnorm(q, q, qnw, 1, hd, c->eps);
-      rope(m, q, pos);
+      rope(m, q, cs, sn);
     }
     for (int hh = 0; hh < nkv; hh++) {
       float *k = kv + (size_t)t * 2 * nkv * hd + (size_t)hh * hd;
       const float *v = kv + (size_t)t * 2 * nkv * hd + (size_t)(nkv + hh) * hd;
       rmsnorm(k, k, knw, 1, hd, c->eps);
-      rope(m, k, pos);
+      rope(m, k, cs, sn);
       memcpy(kc + ((size_t)pos * nkv + hh) * hd, k, (size_t)hd * sizeof(float));
       memcpy(vc + ((size_t)pos * nkv + hh) * hd, v, (size_t)hd * sizeof(float));
     }

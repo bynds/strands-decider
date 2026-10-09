@@ -10,3 +10,4 @@ r8-q4-table	plain q4 dequantisation: a 16-value table per block, four weights pe
 r9-dot2-unroll	plain matmul kernel: sixteen inputs per loop iteration
 r10-attn-asm	attention in VFP assembly: two cached positions per score pass, weighted values with 8 columns in registers
 r11-conv-rows	DeltaNet convolution: the four input rows resolved once per step, no branch per channel and tap
+r12-rope-once	RoPE: cosines and sines once per position instead of once per head
