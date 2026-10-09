@@ -6,7 +6,7 @@ LDLIBS += -lm
 OUT ?= build
 
 RUNTIME = runtime/jd_unicode.c runtime/jd_tokenizer.c runtime/jd_kernels.c runtime/jd_model.c \
-          runtime/jd_engine.c runtime/jd_json.c
+          runtime/jd_engine.c runtime/jd_json.c runtime/jd_prof.c
 HEADERS = $(wildcard runtime/*.h)
 
 all: $(OUT)/jibo-decider $(OUT)/tok_dump $(OUT)/fwd_dump $(OUT)/bench-op $(OUT)/jibo-gl-probe
@@ -14,6 +14,14 @@ all: $(OUT)/jibo-decider $(OUT)/tok_dump $(OUT)/fwd_dump $(OUT)/bench-op $(OUT)/
 $(OUT)/jibo-decider: runtime/main.c $(RUNTIME) $(HEADERS)
 	@mkdir -p $(OUT)
 	$(CC) $(CFLAGS) -o $@ runtime/main.c $(RUNTIME) $(LDFLAGS) $(LDLIBS)
+
+$(OUT)/bench-engine: perfvm/bench_engine.c perfvm/jd_icount.h $(RUNTIME) $(HEADERS)
+	@mkdir -p $(OUT)
+	$(CC) $(CFLAGS) -o $@ perfvm/bench_engine.c $(RUNTIME) $(LDFLAGS) $(LDLIBS)
+
+$(OUT)/trace: tests/trace.c $(RUNTIME) $(HEADERS)
+	@mkdir -p $(OUT)
+	$(CC) $(CFLAGS) -o $@ tests/trace.c $(RUNTIME) $(LDFLAGS) $(LDLIBS)
 
 $(OUT)/tok_dump: tests/tok_dump.c runtime/jd_unicode.c runtime/jd_tokenizer.c $(HEADERS)
 	@mkdir -p $(OUT)

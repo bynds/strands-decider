@@ -1,0 +1,1 @@
+{"state": "Jibo, can you set a timer for ten minutes? I am cooking pasta and I keep forgetting. The water just started boiling and the sauce is already on the stove.", "questions": {"intent": {"type": "choice", "instructions": "What does the speaker want?", "criteria": {"timer": "set a timer or alarm", "weather": "weather", "music": "play music", "chat": "small talk"}}}}

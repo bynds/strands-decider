@@ -1,4 +1,5 @@
 #include "jd_engine.h"
+#include "jd_prof.h"
 
 #include <math.h>
 #include <stdarg.h>
@@ -263,10 +264,11 @@ static void project(float *y, const jd_tensor *w, const jd_tensor *bias, const f
 static void head(const jd_model *m, const float *decide, const float *const *opts, int n, float temp,
                  float *probs) {
   int H = m->c.hidden, P = m->c.pointer_dim;
+  JD_PB(JD_P_HEAD);
   float *nrm = malloc((size_t)H * sizeof(float)), *q = malloc((size_t)P * sizeof(float)),
         *k = malloc((size_t)P * sizeof(float));
   double *lg = malloc((size_t)n * sizeof(double));
-  if (!nrm || !q || !k || !lg) { free(nrm); free(q); free(k); free(lg); return; }
+  if (!nrm || !q || !k || !lg) { free(nrm); free(q); free(k); free(lg); goto out; }
   layernorm(nrm, decide, m->head_ln_w.data, m->head_ln_b.data, H, m->c.head_ln_eps);
   project(q, &m->head_q_w, &m->head_q_b, nrm, H);
   float scale = 1.0f / sqrtf((float)P);
@@ -282,6 +284,8 @@ static void head(const jd_model *m, const float *decide, const float *const *opt
   for (int j = 0; j < n; j++) sum += exp(lg[j] - mx);
   for (int j = 0; j < n; j++) probs[j] = (float)exp(lg[j] - mx - log(sum));
   free(nrm); free(q); free(k); free(lg);
+out:;
+  JD_PE();
 }
 
 static float temp_for(const jd_model *m, int kind) {
@@ -305,6 +309,7 @@ int jd_evaluate(jd_engine *e, const jd_request *r, jd_answer *answers, long *inp
   *input_tokens = 0;
   if (!rq || !qt || !cut) FAIL("out of memory");
 
+  JD_PB(JD_P_TOKENIZE);
   for (int i = 0; i < nq; i++) {
     if (render_question(&r->q[i], &rq[i]) != 0) FAIL("cannot render question %s", r->q[i].name);
     if (jd_tok_encode(e->tok, rq[i].text, strlen(rq[i].text), &qt[i]) != 0) FAIL("cannot tokenise question");
@@ -320,6 +325,7 @@ int jd_evaluate(jd_engine *e, const jd_request *r, jd_answer *answers, long *inp
     state_text = b.s;
   }
   if (jd_tok_encode(e->tok, state_text, strlen(state_text), &st) != 0) FAIL("cannot tokenise state");
+  JD_PE();
 
   /* _fit: the question claims the window first; the state keeps its first tokens */
   size_t longest = 0;

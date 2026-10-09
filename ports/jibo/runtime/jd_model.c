@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include "jd_kernels.h"
+#include "jd_prof.h"
 
 /* ---- loading ----------------------------------------------------------------------------- */
 
@@ -212,15 +213,18 @@ void jd_state_free(jd_state *s, const jd_model *m) {
 
 void jd_state_reset(jd_state *s, const jd_model *m) {
   const jd_config *c = &m->c;
+  JD_PB(JD_P_STATE);
   s->pos = 0;
   for (int i = 0; i < c->n_layers; i++) {
     if (s->conv[i]) memset(s->conv[i], 0, (size_t)(c->conv_k - 1) * conv_dim(c) * sizeof(float));
     if (s->rec[i]) memset(s->rec[i], 0, (size_t)c->lin_nv * c->lin_dk * c->lin_dv * sizeof(float));
   }
+  JD_PE();
 }
 
 void jd_state_copy(jd_state *dst, const jd_state *src, const jd_model *m) {
   const jd_config *c = &m->c;
+  JD_PB(JD_P_STATE);
   dst->pos = src->pos;
   for (int i = 0; i < c->n_layers; i++) {
     if (src->conv[i]) {
@@ -232,6 +236,7 @@ void jd_state_copy(jd_state *dst, const jd_state *src, const jd_model *m) {
       memcpy(dst->vc[i], src->vc[i], n);
     }
   }
+  JD_PE();
 }
 
 /* ---- the forward ------------------------------------------------------------------------- */
@@ -280,15 +285,18 @@ static void gated_deltanet(const jd_model *m, const jd_layer *L, int li, jd_stat
   float *mixed = sc->big1;   /* n x cd */
   float *z = sc->big2;       /* n x vd */
   float *ab = sc->small;     /* n x 2nv: b then a */
+  JD_PB(JD_P_LIN_PROJ);
   jd_matmul(mixed, cd, h, n, H, &L->qkv);
   jd_matmul(z, vd, h, n, H, &L->z);
   jd_matmul(ab, 2 * nv, h, n, H, &L->b);
   jd_matmul(ab + nv, 2 * nv, h, n, H, &L->a);
+  JD_PE();
 
   /* causal depthwise convolution over [state; mixed], then SiLU; the state keeps the last K-1 inputs */
   const float *w = (const float *)L->conv.data; /* cd x K */
   float *cs = s->conv[li];                      /* (K-1) x cd */
   float *conv_out = sc->mix;                    /* n x cd (mix is n x max(H, cd)) */
+  JD_PB(JD_P_LIN_CONV);
   for (int t = 0; t < n; t++) {
     for (int ch = 0; ch < cd; ch++) {
       float acc = 0.0f;
@@ -308,12 +316,14 @@ static void gated_deltanet(const jd_model *m, const jd_layer *L, int li, jd_stat
     else memmove(dst, cs + (size_t)(K - 1 + src) * cd, (size_t)cd * sizeof(float));
   }
   /* (when n < K-1 the memmove reads entry j+n, which this loop has not overwritten yet) */
+  JD_PE();
 
   const float *dt_bias = (const float *)L->dt_bias.data, *a_log = (const float *)L->a_log.data;
   const float *gw = (const float *)L->gnorm.data;
   float *S = s->rec[li];
   float qn[512], kn[512], kv_mem[512], o[512];
   float qscale = 1.0f / sqrtf((float)dk);
+  JD_PB(JD_P_LIN_REC);
   for (int t = 0; t < n; t++) {
     const float *row = conv_out + (size_t)t * cd;
     for (int hv = 0; hv < nv; hv++) {
@@ -354,7 +364,10 @@ static void gated_deltanet(const jd_model *m, const jd_layer *L, int li, jd_stat
       memcpy(z + (size_t)t * vd + (size_t)hv * dv, o, (size_t)dv * sizeof(float));
     }
   }
+  JD_PE();
+  JD_PB(JD_P_LIN_OUT);
   jd_matmul(out, H, z, n, vd, &L->out);
+  JD_PE();
 }
 
 static void rope(const jd_model *m, float *x, int pos) {
@@ -374,11 +387,14 @@ static void attention(const jd_model *m, const jd_layer *L, int li, jd_state *s,
   int H = c->hidden, nh = c->n_heads, nkv = c->n_kv, hd = c->head_dim, rep = nh / nkv;
   float *qg = sc->big1;  /* n x (2 nh hd): per head, query then gate */
   float *kv = sc->big2;  /* n x (2 nkv hd): keys then values */
+  JD_PB(JD_P_ATTN_PROJ);
   jd_matmul(qg, 2 * nh * hd, h, n, H, &L->q);
   jd_matmul(kv, 2 * nkv * hd, h, n, H, &L->k);
   jd_matmul(kv + nkv * hd, 2 * nkv * hd, h, n, H, &L->v);
+  JD_PE();
   const float *qnw = (const float *)L->q_norm.data, *knw = (const float *)L->k_norm.data;
   float *kc = s->kc[li], *vc = s->vc[li];
+  JD_PB(JD_P_ATTN_ROPE);
   for (int t = 0; t < n; t++) {
     int pos = s->pos + t;
     for (int hh = 0; hh < nh; hh++) {
@@ -395,7 +411,9 @@ static void attention(const jd_model *m, const jd_layer *L, int li, jd_state *s,
       memcpy(vc + ((size_t)pos * nkv + hh) * hd, v, (size_t)hd * sizeof(float));
     }
   }
+  JD_PE();
   float *att = sc->mix; /* n x nh x hd */
+  JD_PB(JD_P_ATTN);
   float scale = 1.0f / sqrtf((float)hd);
   float *p = sc->small; /* scores, length cap */
   for (int t = 0; t < n; t++) {
@@ -425,7 +443,10 @@ static void attention(const jd_model *m, const jd_layer *L, int li, jd_state *s,
       for (int i = 0; i < hd; i++) o[i] *= sigmoidf_(gate[i]);
     }
   }
+  JD_PE();
+  JD_PB(JD_P_ATTN_OUT);
   jd_matmul(out, H, att, n, nh * hd, &L->o);
+  JD_PE();
 }
 
 static void mlp(const jd_model *m, const jd_layer *L, const float *h, int n, float *out, scratch *sc) {
@@ -461,19 +482,30 @@ int jd_forward(const jd_model *m, jd_state *s, const int32_t *ids, int n, float 
   if (!x || !sc.h || !sc.mix || !sc.big1 || !sc.big2 || !sc.small || !o) goto done;
   for (int t0 = 0; t0 < n; t0 += chunk) {
     int nc = n - t0 < chunk ? n - t0 : chunk;
+    JD_PB(JD_P_EMBED);
     embed_rows(m, ids + t0, nc, x);
+    JD_PE();
     for (int li = 0; li < c->n_layers; li++) {
       const jd_layer *L = &m->layers[li];
+      int lin = L->type == JD_LAYER_LINEAR;
+      JD_PB(lin ? JD_P_LIN_PROJ : JD_P_ATTN_PROJ);
       rmsnorm(sc.h, x, (const float *)L->in_norm.data, nc, H, c->eps);
-      if (L->type == JD_LAYER_LINEAR) gated_deltanet(m, L, li, s, sc.h, nc, o, &sc);
+      JD_PE();
+      if (lin) gated_deltanet(m, L, li, s, sc.h, nc, o, &sc);
       else attention(m, L, li, s, sc.h, nc, o, &sc);
+      JD_PB(lin ? JD_P_LIN_OUT : JD_P_ATTN_OUT);
       for (size_t i = 0; i < (size_t)nc * H; i++) x[i] += o[i];
+      JD_PE();
+      JD_PB(JD_P_MLP);
       rmsnorm(sc.h, x, (const float *)L->post_norm.data, nc, H, c->eps);
       mlp(m, L, sc.h, nc, o, &sc);
       for (size_t i = 0; i < (size_t)nc * H; i++) x[i] += o[i];
+      JD_PE();
       if (layer_dump) layer_dump(dump_ctx, li, s->pos, nc, x, H);
     }
+    JD_PB(JD_P_HEAD);
     rmsnorm(out + (size_t)t0 * H, x, (const float *)m->final_norm.data, nc, H, c->eps);
+    JD_PE();
     s->pos += nc;
   }
   rc = 0;
