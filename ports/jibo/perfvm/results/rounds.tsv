@@ -12,3 +12,4 @@ r10-attn-asm	attention in VFP assembly: two cached positions per score pass, wei
 r11-conv-rows	DeltaNet convolution: the four input rows resolved once per step, no branch per channel and tap
 r12-rope-once	RoPE: cosines and sines once per position instead of once per head
 r13-skip-unread	the last layer skips the rows the pointer head never reads (one layer in four here, one in 24 in the real model)
+r14-q8-asm	plain q8 dequantisation in assembly: paired register moves, eight conversions and multiplies per store

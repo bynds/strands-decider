@@ -77,7 +77,53 @@ void jd_dequant_row(const jd_tensor *w, int row, float *dst) {
     for (int k = 0; k < nb; k++, b += 34) {
       float s = jd_f16_to_f32((uint16_t)(b[0] | (b[1] << 8)));
       const int8_t *q = (const int8_t *)(b + 2);
+#if defined(__arm__) && defined(__ARM_FP)
+      /* Per 8 weights: eight sign-extending byte loads, four paired moves into VFP registers,
+       * eight conversions and eight multiplies by the scale, one store: the products of the
+       * loop below, about 31 instructions where it takes 56. */
+      float *d = dst + k * 32;
+      int c = 4;
+      unsigned r0, r1, r2, r3, r4, r5, r6, r7;
+      __asm__ volatile(
+          "1:\n\t"
+          "ldrsb %[r0], [%[q]], #1\n\t"
+          "ldrsb %[r1], [%[q]], #1\n\t"
+          "ldrsb %[r2], [%[q]], #1\n\t"
+          "ldrsb %[r3], [%[q]], #1\n\t"
+          "ldrsb %[r4], [%[q]], #1\n\t"
+          "ldrsb %[r5], [%[q]], #1\n\t"
+          "ldrsb %[r6], [%[q]], #1\n\t"
+          "ldrsb %[r7], [%[q]], #1\n\t"
+          "vmov s0, s1, %[r0], %[r1]\n\t"
+          "vmov s2, s3, %[r2], %[r3]\n\t"
+          "vmov s4, s5, %[r4], %[r5]\n\t"
+          "vmov s6, s7, %[r6], %[r7]\n\t"
+          "vcvt.f32.s32 s0, s0\n\t"
+          "vcvt.f32.s32 s1, s1\n\t"
+          "vcvt.f32.s32 s2, s2\n\t"
+          "vcvt.f32.s32 s3, s3\n\t"
+          "vcvt.f32.s32 s4, s4\n\t"
+          "vcvt.f32.s32 s5, s5\n\t"
+          "vcvt.f32.s32 s6, s6\n\t"
+          "vcvt.f32.s32 s7, s7\n\t"
+          "vmul.f32 s0, s0, %[s]\n\t"
+          "vmul.f32 s1, s1, %[s]\n\t"
+          "vmul.f32 s2, s2, %[s]\n\t"
+          "vmul.f32 s3, s3, %[s]\n\t"
+          "vmul.f32 s4, s4, %[s]\n\t"
+          "vmul.f32 s5, s5, %[s]\n\t"
+          "vmul.f32 s6, s6, %[s]\n\t"
+          "vmul.f32 s7, s7, %[s]\n\t"
+         "vstmia %[d]!, {s0-s7}\n\t"
+          "subs %[c], %[c], #1\n\t"
+          "bne 1b"
+          : [q] "+r"(q), [d] "+r"(d), [c] "+r"(c), [r0] "=&r"(r0), [r1] "=&r"(r1), [r2] "=&r"(r2),
+            [r3] "=&r"(r3), [r4] "=&r"(r4), [r5] "=&r"(r5), [r6] "=&r"(r6), [r7] "=&r"(r7)
+          : [s] "t"(s)
+          : "cc", "memory", "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7");
+#else
       for (int i = 0; i < 32; i++) dst[k * 32 + i] = s * (float)q[i];
+#endif
     }
   } else { /* JD_Q4 */
     const unsigned char *b = (const unsigned char *)w->data + (size_t)row * nb * 18;
