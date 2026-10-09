@@ -114,6 +114,56 @@ static float dot(const float *a, const float *b, int n) {
 #endif
 }
 
+#if defined(__arm__) && defined(__ARM_FP) && !defined(JD_NEON)
+#define JD_VFP_DOT2 1
+/* Two tokens against one weight row: what dot computes for each, with the weights loaded once
+ * for both. Per 8 inputs, three 8-register loads and sixteen vmla; each token keeps its eight
+ * lanes and their order. The lanes live in s0-s15 (token 0 in s0-s7), loaded from and stored to
+ * acc around the loop; the inputs pass through s16-s31. */
+static void dot2(const float *x0, const float *x1, const float *w, int n, float *y0, float *y1) {
+  float acc[16] = {0};
+  int i = 0;
+  if (n >= 8) {
+    const float *p0 = x0, *p1 = x1, *pw = w;
+    int k = n / 8;
+    __asm__ volatile(
+        "vldmia %[acc], {s0-s15}\n\t"
+        "1:\n\t"
+        "vldmia %[pw]!, {s16-s23}\n\t"
+        "vldmia %[p0]!, {s24-s31}\n\t"
+        "vmla.f32 s0, s24, s16\n\t"
+        "vmla.f32 s1, s25, s17\n\t"
+        "vmla.f32 s2, s26, s18\n\t"
+        "vmla.f32 s3, s27, s19\n\t"
+        "vmla.f32 s4, s28, s20\n\t"
+        "vmla.f32 s5, s29, s21\n\t"
+        "vmla.f32 s6, s30, s22\n\t"
+        "vmla.f32 s7, s31, s23\n\t"
+        "vldmia %[p1]!, {s24-s31}\n\t"
+        "vmla.f32 s8, s24, s16\n\t"
+        "vmla.f32 s9, s25, s17\n\t"
+        "vmla.f32 s10, s26, s18\n\t"
+        "vmla.f32 s11, s27, s19\n\t"
+        "vmla.f32 s12, s28, s20\n\t"
+        "vmla.f32 s13, s29, s21\n\t"
+        "vmla.f32 s14, s30, s22\n\t"
+        "vmla.f32 s15, s31, s23\n\t"
+        "subs %[k], %[k], #1\n\t"
+        "bne 1b\n\t"
+        "vstmia %[acc], {s0-s15}"
+        : [p0] "+r"(p0), [p1] "+r"(p1), [pw] "+r"(pw), [k] "+r"(k)
+        : [acc] "r"(acc)
+        : "cc", "memory", "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13", "s14", "s15", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26", "s27", "s28", "s29", "s30", "s31");
+    i = n & ~7;
+  }
+  float *a = acc, *b = acc + 8;
+  for (int j = i; j < n; j++) a[0] += x0[j] * w[j];
+  for (int j = i; j < n; j++) b[0] += x1[j] * w[j];
+  *y0 = ((a[0] + a[4]) + (a[1] + a[5])) + ((a[2] + a[6]) + (a[3] + a[7]));
+  *y1 = ((b[0] + b[4]) + (b[1] + b[5])) + ((b[2] + b[6]) + (b[3] + b[7]));
+}
+#endif
+
 #ifdef JD_NEON
 static float hsum(float32x4_t v) {
   float32x2_t r = vadd_f32(vget_low_f32(v), vget_high_f32(v));
@@ -191,7 +241,13 @@ void jd_matmul(float *y, int ldy, const float *x, int n, int in, const jd_tensor
       const float *wr;
       if (w->dtype == JD_F32) wr = (const float *)w->data + (size_t)o * in;
       else { jd_dequant_row(w, o, row); wr = row; }
-      for (int t = 0; t < n; t++) y[(size_t)t * ldy + o] = dot(x + (size_t)t * in, wr, in);
+      int t = 0;
+#ifdef JD_VFP_DOT2
+      for (; t + 2 <= n; t += 2)
+        dot2(x + (size_t)t * in, x + (size_t)(t + 1) * in, wr, in, &y[(size_t)t * ldy + o],
+             &y[(size_t)(t + 1) * ldy + o]);
+#endif
+      for (; t < n; t++) y[(size_t)t * ldy + o] = dot(x + (size_t)t * in, wr, in);
     }
     free(row);
   }
