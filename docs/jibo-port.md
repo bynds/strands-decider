@@ -50,6 +50,12 @@ Recorded on 7 October 2026. Everything below ran on x86 or under an ARM emulator
   p = 0.79), ECE 0.074. Against its own fp32 export on held-out questions its answer
   distributions differ by a mean KL of 0.0053 (plain 4-bit rounding: 0.020). The GPU path must
   release the weights' CPU pages after upload to stay inside the ceiling.
+- **CPU cost, counted exactly.** `ports/jibo/perfvm` counts the instructions the ARMv7 builds
+  retire, in full-system qemu with `-icount`, and gates every optimisation on bit-identical hidden
+  states and answers. Fourteen changes took the full model's 109-token prefill from 466.75 to
+  79.61 G instructions in the shipped plain (VFPv3-D16) build and from 68.90 to 30.02 G with
+  NEON, the outputs unchanged to the bit
+  ([ports/jibo/README.md](../ports/jibo/README.md#armv7-instruction-counts)).
 - **Phase 4, in part:** a stand-in cross-build (GCC 13 against Debian 8's glibc 2.19) passes the
   ABI check, needing at most `GLIBC_2.17`, and the runtime's parity tests pass under qemu-arm
   with the NEON kernels. The owner's `jibo-armcc` build and any robot run are still to come.

@@ -204,6 +204,23 @@ Exact user-space instructions retired, counted in full-system qemu with `-icount
 hidden states of every layer and every answer are the same to the bit as before any change, for
 x86, ARM plain and ARM NEON. Plain is the shipped build (`-mfpu=vfpv3-d16`).
 
+On the whole model (`perfvm/bench-full.sh`: all 24 layers of the v22 dynamic-q4 export, the
+109-token prefill), G instructions:
+
+| build | before (76877ac) | after | change |
+| --- | ---: | ---: | ---: |
+| plain (VFPv3-D16, shipped) | 466.75 | 79.61 | -82.9% |
+| NEON | 68.90 | 30.02 | -56.4% |
+
+What is left: matrix products are about 85% of the plain build, at roughly 1.3 instructions per
+multiply-add (each output must keep its eight summation lanes and their order, and two tokens'
+lanes fill VFPv3-D16's 32 registers). Much of the rest is glibc 2.21's `expf` (about 96
+instructions a call) in SiLU and the gates, which bit-for-bit parity rules out replacing. Instruction
+counts are not time: a NEON `vmla` or an eight-register `vldm` costs more cycles than a scalar
+add, and qemu models no caches. The robot measures latency.
+
+Per round, on the bench's four-layer model:
+
 <!-- rounds: python perfvm/table.py -->
 | round | change | plain prefill | plain prefix_hit | plain request3 | NEON prefill | NEON prefix_hit | NEON request3 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
