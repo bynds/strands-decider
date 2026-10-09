@@ -220,6 +220,7 @@ x86, ARM plain and ARM NEON. Plain is the shipped build (`-mfpu=vfpv3-d16`).
 | `r10-attn-asm` | attention in VFP assembly: two cached positions per score pass, weighted values with 8 columns in registers | 13.83 (-82%) | 8.97 (-82%) | 31.20 (-82%) | 5.21 (-55%) | 3.37 (-56%) | 12.05 (-55%) |
 | `r11-conv-rows` | DeltaNet convolution: the four input rows resolved once per step, no branch per channel and tap | 13.73 (-82%) | 8.90 (-82%) | 30.99 (-82%) | 5.11 (-55%) | 3.31 (-57%) | 11.84 (-55%) |
 | `r12-rope-once` | RoPE: cosines and sines once per position instead of once per head | 13.73 (-82%) | 8.90 (-82%) | 30.98 (-82%) | 5.11 (-55%) | 3.30 (-57%) | 11.83 (-55%) |
+| `r13-skip-unread` | the last layer skips the rows the pointer head never reads (one layer in four here, one in 24 in the real model) | 11.86 (-85%) | 8.90 (-82%) | 27.23 (-84%) | 4.49 (-61%) | 3.30 (-57%) | 10.59 (-60%) |
 
 ## Not done yet
 

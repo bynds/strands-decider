@@ -356,7 +356,8 @@ int jd_evaluate(jd_engine *e, const jd_request *r, jd_answer *answers, long *inp
     if (shared) {
       if (!done_prefix) {
         jd_state_reset(&e->snap, m);
-        if (jd_forward(m, &e->snap, ids, (int)ns, e->hidden, e->o.chunk, NULL, NULL) != 0)
+        /* nothing reads the prefix's own outputs, only the state it leaves */
+        if (jd_forward_from(m, &e->snap, ids, (int)ns, e->hidden, e->o.chunk, (int)ns) != 0)
           FAIL("forward failed");
         done_prefix = 1;
       }
@@ -368,13 +369,27 @@ int jd_evaluate(jd_engine *e, const jd_request *r, jd_answer *answers, long *inp
       if (shared) jd_state_copy(&e->s, &e->snap, m);
       else jd_state_reset(&e->s, m);
       for (size_t j = 0; j < nqi; j++) ids[base + j] = qt[i].ids[cut[i] + j];
+      /* the rows the head reads: the options' and the last; the forward may skip the rest */
+      int *idx = malloc((size_t)rq[i].n * sizeof(int));
+      if (!idx) FAIL("out of memory");
+      int first = (int)nqi - 1;
+      for (int k = 0; k < rq[i].n; k++) {
+        idx[k] = option_index(&qt[i], cut[i], rq[i].span_a[k], rq[i].span_b[k]);
+        if (idx[k] < 0) {
+          size_t a = rq[i].span_a[k], b = rq[i].span_b[k];
+          free(idx);
+          FAIL("option span (%zu,%zu) has no tokens left; the prompt was truncated through its option list", a, b);
+        }
+        if (idx[k] < first) first = idx[k];
+      }
+      int fwd;
       if (shared) {
-        if (jd_forward(m, &e->s, ids, (int)nqi, e->hidden, e->o.chunk, NULL, NULL) != 0) FAIL("forward failed");
+        fwd = jd_forward_from(m, &e->s, ids, (int)nqi, e->hidden, e->o.chunk, first);
       } else {
         for (size_t j = 0; j < ns; j++) ids[j] = st.ids[j];
-        if (jd_forward(m, &e->s, ids, (int)(ns + nqi), e->hidden, e->o.chunk, NULL, NULL) != 0)
-          FAIL("forward failed");
+        fwd = jd_forward_from(m, &e->s, ids, (int)(ns + nqi), e->hidden, e->o.chunk, (int)base + first);
       }
+      if (fwd != 0) { free(idx); FAIL("forward failed"); }
       *input_tokens += (long)(base + nqi);
       jd_answer *a = &answers[i];
       a->kind = rq[i].kind;
@@ -384,16 +399,9 @@ int jd_evaluate(jd_engine *e, const jd_request *r, jd_answer *answers, long *inp
       rq[i].labels = rq[i].descs = NULL;
       a->probs = calloc((size_t)a->n, sizeof(float));
       const float **opts = calloc((size_t)a->n, sizeof(float *));
-      if (!a->probs || !opts) { free(opts); FAIL("out of memory"); }
-      for (int k = 0; k < a->n; k++) {
-        int idx = option_index(&qt[i], cut[i], rq[i].span_a[k], rq[i].span_b[k]);
-        if (idx < 0) {
-          free(opts);
-          FAIL("option span (%zu,%zu) has no tokens left; the prompt was truncated through its option list",
-               rq[i].span_a[k], rq[i].span_b[k]);
-        }
-        opts[k] = e->hidden + (base + (size_t)idx) * H;
-      }
+      if (!a->probs || !opts) { free(opts); free(idx); FAIL("out of memory"); }
+      for (int k = 0; k < a->n; k++) opts[k] = e->hidden + (base + (size_t)idx[k]) * H;
+      free(idx);
       head(m, e->hidden + (base + nqi - 1) * H, opts, a->n, temp_for(m, a->kind), a->probs);
       free(opts);
     }

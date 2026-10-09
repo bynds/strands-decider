@@ -76,4 +76,12 @@ typedef void (*jd_layer_dump_fn)(void *ctx, int layer, int t0, int n, const floa
 int jd_forward(const jd_model *m, jd_state *s, const int32_t *ids, int n, float *out, int chunk,
                jd_layer_dump_fn layer_dump, void *dump_ctx);
 
+/* jd_forward when only rows need_from.. of `out` will be read (the pointer head reads the last
+ * row and the options'): the last layer leaves out the work that only those rows' outputs need
+ * (queries, attention, output projection, MLP, final norm) for earlier rows, from a multiple of
+ * 4 within each chunk. The state comes out the same, and so do the rows read, to the bit. Rows
+ * before need_from are left unwritten. */
+int jd_forward_from(const jd_model *m, jd_state *s, const int32_t *ids, int n, float *out, int chunk,
+                    int need_from);
+
 #endif

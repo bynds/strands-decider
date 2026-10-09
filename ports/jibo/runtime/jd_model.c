@@ -356,8 +356,10 @@ static void rec_update(float *S, int stride, const float *kn, const float *qn, i
 }
 #endif
 
+/* skip: rows whose output nothing reads (the last layer's, below forward's need_from); their
+ * state updates still happen, only the output projection is left out for them. */
 static void gated_deltanet(const jd_model *m, const jd_layer *L, int li, jd_state *s, const float *h,
-                           int n, float *out, scratch *sc) {
+                           int n, float *out, scratch *sc, int skip) {
   const jd_config *c = &m->c;
   int H = c->hidden, kd = c->lin_nk * c->lin_dk, vd = c->lin_nv * c->lin_dv, cd = conv_dim(c);
   int K = c->conv_k, nv = c->lin_nv, dk = c->lin_dk, dv = c->lin_dv, rep = c->lin_nv / c->lin_nk;
@@ -508,7 +510,7 @@ static void gated_deltanet(const jd_model *m, const jd_layer *L, int li, jd_stat
   }
   JD_PE();
   JD_PB(JD_P_LIN_OUT);
-  jd_matmul(out, H, z, n, vd, &L->out);
+  if (n > skip) jd_matmul(out + (size_t)skip * H, H, z + (size_t)skip * vd, n - skip, vd, &L->out);
   JD_PE();
 }
 
@@ -620,14 +622,17 @@ static void attn_pv8(const float *v, int stride, const float *w, int np, float *
 }
 #endif
 
+/* skip: rows whose output nothing reads; their keys and values still go into the cache, and only
+ * their queries, attention and output projection are left out. */
 static void attention(const jd_model *m, const jd_layer *L, int li, jd_state *s, const float *h,
-                      int n, float *out, scratch *sc) {
+                      int n, float *out, scratch *sc, int skip) {
   const jd_config *c = &m->c;
   int H = c->hidden, nh = c->n_heads, nkv = c->n_kv, hd = c->head_dim, rep = nh / nkv;
   float *qg = sc->big1;  /* n x (2 nh hd): per head, query then gate */
   float *kv = sc->big2;  /* n x (2 nkv hd): keys then values */
   JD_PB(JD_P_ATTN_PROJ);
-  jd_matmul(qg, 2 * nh * hd, h, n, H, &L->q);
+  if (n > skip)
+    jd_matmul(qg + (size_t)skip * 2 * nh * hd, 2 * nh * hd, h + (size_t)skip * H, n - skip, H, &L->q);
   jd_matmul(kv, 2 * nkv * hd, h, n, H, &L->k);
   jd_matmul(kv + nkv * hd, 2 * nkv * hd, h, n, H, &L->v);
   JD_PE();
@@ -638,7 +643,7 @@ static void attention(const jd_model *m, const jd_layer *L, int li, jd_state *s,
   for (int t = 0; t < n; t++) {
     int pos = s->pos + t;
     rope_angles(m, pos, cs, sn);
-    for (int hh = 0; hh < nh; hh++) {
+    for (int hh = 0; t >= skip && hh < nh; hh++) {
       float *q = qg + (size_t)t * 2 * nh * hd + (size_t)hh * 2 * hd;
       rmsnorm(q, q, qnw, 1, hd, c->eps);
       rope(m, q, cs, sn);
@@ -657,7 +662,7 @@ static void attention(const jd_model *m, const jd_layer *L, int li, jd_state *s,
   JD_PB(JD_P_ATTN);
   float scale = 1.0f / sqrtf((float)hd);
   float *p = sc->small; /* scores, length cap */
-  for (int t = 0; t < n; t++) {
+  for (int t = skip; t < n; t++) {
     int last = s->pos + t;
     for (int hh = 0; hh < nh; hh++) {
       const float *q = qg + (size_t)t * 2 * nh * hd + (size_t)hh * 2 * hd;
@@ -708,7 +713,7 @@ static void attention(const jd_model *m, const jd_layer *L, int li, jd_state *s,
   }
   JD_PE();
   JD_PB(JD_P_ATTN_OUT);
-  jd_matmul(out, H, att, n, nh * hd, &L->o);
+  if (n > skip) jd_matmul(out + (size_t)skip * H, H, att + (size_t)skip * nh * hd, n - skip, nh * hd, &L->o);
   JD_PE();
 }
 
@@ -721,8 +726,8 @@ static void mlp(const jd_model *m, const jd_layer *L, const float *h, int n, flo
   jd_matmul(out, H, g, n, I, &L->down);
 }
 
-int jd_forward(const jd_model *m, jd_state *s, const int32_t *ids, int n, float *out, int chunk,
-               jd_layer_dump_fn layer_dump, void *dump_ctx) {
+static int forward(const jd_model *m, jd_state *s, const int32_t *ids, int n, float *out, int chunk,
+                   jd_layer_dump_fn layer_dump, void *dump_ctx, int need_from) {
   const jd_config *c = &m->c;
   if (s->pos + n > s->cap) return -1;
   if (chunk <= 0) chunk = 64;
@@ -748,26 +753,36 @@ int jd_forward(const jd_model *m, jd_state *s, const int32_t *ids, int n, float 
     JD_PB(JD_P_EMBED);
     embed_rows(m, ids + t0, nc, x);
     JD_PE();
+    /* Rows of this chunk before need_from feed nothing past the last layer's state. Rounded down
+     * to a multiple of 4 from the chunk's start, so that the rows left group into the matmul
+     * kernels' tiles exactly as they did, and their results do not move by a bit. */
+    int skip = need_from > t0 ? need_from - t0 : 0;
+    if (skip > nc) skip = nc;
+    skip &= ~3;
     for (int li = 0; li < c->n_layers; li++) {
       const jd_layer *L = &m->layers[li];
       int lin = L->type == JD_LAYER_LINEAR;
+      int sk = li == c->n_layers - 1 ? skip : 0;
       JD_PB(lin ? JD_P_LIN_PROJ : JD_P_ATTN_PROJ);
       rmsnorm(sc.h, x, (const float *)L->in_norm.data, nc, H, c->eps);
       JD_PE();
-      if (lin) gated_deltanet(m, L, li, s, sc.h, nc, o, &sc);
-      else attention(m, L, li, s, sc.h, nc, o, &sc);
+      if (lin) gated_deltanet(m, L, li, s, sc.h, nc, o, &sc, sk);
+      else attention(m, L, li, s, sc.h, nc, o, &sc, sk);
       JD_PB(lin ? JD_P_LIN_OUT : JD_P_ATTN_OUT);
-      for (size_t i = 0; i < (size_t)nc * H; i++) x[i] += o[i];
+      for (size_t i = (size_t)sk * H; i < (size_t)nc * H; i++) x[i] += o[i];
       JD_PE();
       JD_PB(JD_P_MLP);
-      rmsnorm(sc.h, x, (const float *)L->post_norm.data, nc, H, c->eps);
-      mlp(m, L, sc.h, nc, o, &sc);
-      for (size_t i = 0; i < (size_t)nc * H; i++) x[i] += o[i];
+      if (nc > sk) {
+        rmsnorm(sc.h + (size_t)sk * H, x + (size_t)sk * H, (const float *)L->post_norm.data, nc - sk, H, c->eps);
+        mlp(m, L, sc.h + (size_t)sk * H, nc - sk, o + (size_t)sk * H, &sc);
+      }
+      for (size_t i = (size_t)sk * H; i < (size_t)nc * H; i++) x[i] += o[i];
       JD_PE();
       if (layer_dump) layer_dump(dump_ctx, li, s->pos, nc, x, H);
     }
     JD_PB(JD_P_HEAD);
-    rmsnorm(out + (size_t)t0 * H, x, (const float *)m->final_norm.data, nc, H, c->eps);
+    rmsnorm(out + (size_t)(t0 + skip) * H, x + (size_t)skip * H, (const float *)m->final_norm.data, nc - skip, H,
+            c->eps);
     JD_PE();
     s->pos += nc;
   }
@@ -775,4 +790,14 @@ int jd_forward(const jd_model *m, jd_state *s, const int32_t *ids, int n, float 
 done:
   free(x); free(sc.h); free(sc.mix); free(sc.big1); free(sc.big2); free(sc.small); free(o);
   return rc;
+}
+
+int jd_forward(const jd_model *m, jd_state *s, const int32_t *ids, int n, float *out, int chunk,
+               jd_layer_dump_fn layer_dump, void *dump_ctx) {
+  return forward(m, s, ids, n, out, chunk, layer_dump, dump_ctx, 0);
+}
+
+int jd_forward_from(const jd_model *m, jd_state *s, const int32_t *ids, int n, float *out, int chunk,
+                    int need_from) {
+  return forward(m, s, ids, n, out, chunk, NULL, NULL, need_from);
 }
