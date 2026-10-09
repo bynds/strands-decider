@@ -188,6 +188,70 @@ static void matmul_neon(float *y, int ldy, const float *x, int n, int in, const 
       w1 = two ? r1 : r0;
     }
     int t = 0;
+    if (in % 8 == 0)
+      for (; t + 4 <= n; t += 4) {
+        /* The tile below in assembly: per 8 inputs, one 4-register load per weight row and
+         * per token (post-increment) and sixteen non-fused vmla, 24 instructions where GCC's
+         * intrinsics take 54. Each accumulator lane adds inputs i, then i + 4: the order of the
+         * loop below, so the sums are the same to the bit. Accumulators: row 0 in q0-q3,
+         * row 1 in q12-q15; weights q8-q11, a token's inputs q4-q5 (d8-d11, callee-saved, so
+         * clobbers that GCC saves once). */
+        const float *x0 = x + (size_t)t * in, *x1 = x0 + in, *x2 = x1 + in, *x3 = x2 + in;
+        const float *pw0 = w0, *pw1 = w1;
+        float acc[32], *pa = acc;
+        int k = in / 8;
+        __asm__ volatile(
+            "vmov.i32 q0, #0\n\t"
+            "vmov.i32 q1, #0\n\t"
+            "vmov.i32 q2, #0\n\t"
+            "vmov.i32 q3, #0\n\t"
+            "vmov.i32 q12, #0\n\t"
+            "vmov.i32 q13, #0\n\t"
+            "vmov.i32 q14, #0\n\t"
+            "vmov.i32 q15, #0\n\t"
+            "1:\n\t"
+            "vld1.32 {d16-d19}, [%[w0]]!\n\t"
+            "vld1.32 {d20-d23}, [%[w1]]!\n\t"
+            "vld1.32 {d8-d11}, [%[x0]]!\n\t"
+            "vmla.f32 q0, q8, q4\n\t"
+            "vmla.f32 q12, q10, q4\n\t"
+            "vmla.f32 q0, q9, q5\n\t"
+            "vmla.f32 q12, q11, q5\n\t"
+            "vld1.32 {d8-d11}, [%[x1]]!\n\t"
+            "vmla.f32 q1, q8, q4\n\t"
+            "vmla.f32 q13, q10, q4\n\t"
+            "vmla.f32 q1, q9, q5\n\t"
+            "vmla.f32 q13, q11, q5\n\t"
+            "vld1.32 {d8-d11}, [%[x2]]!\n\t"
+            "vmla.f32 q2, q8, q4\n\t"
+            "vmla.f32 q14, q10, q4\n\t"
+            "vmla.f32 q2, q9, q5\n\t"
+            "vmla.f32 q14, q11, q5\n\t"
+            "vld1.32 {d8-d11}, [%[x3]]!\n\t"
+            "vmla.f32 q3, q8, q4\n\t"
+            "vmla.f32 q15, q10, q4\n\t"
+            "vmla.f32 q3, q9, q5\n\t"
+            "vmla.f32 q15, q11, q5\n\t"
+            "subs %[k], %[k], #1\n\t"
+            "bne 1b\n\t"
+            "vst1.32 {d0-d3}, [%[acc]]!\n\t"
+            "vst1.32 {d4-d7}, [%[acc]]!\n\t"
+            "vst1.32 {d24-d27}, [%[acc]]!\n\t"
+            "vst1.32 {d28-d31}, [%[acc]]"
+            : [w0] "+r"(pw0), [w1] "+r"(pw1), [x0] "+r"(x0), [x1] "+r"(x1), [x2] "+r"(x2), [x3] "+r"(x3),
+              [k] "+r"(k), [acc] "+r"(pa), "=m"(acc)
+            :
+            : "cc", "memory", "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9", "d10", "d11",
+              "d16", "d17", "d18", "d19", "d20", "d21", "d22", "d23", "d24", "d25", "d26", "d27", "d28",
+              "d29", "d30", "d31");
+        float *yt = y + (size_t)t * ldy + o;
+        yt[0] = hsum(vld1q_f32(acc)); yt[ldy] = hsum(vld1q_f32(acc + 4));
+        yt[2 * ldy] = hsum(vld1q_f32(acc + 8)); yt[3 * ldy] = hsum(vld1q_f32(acc + 12));
+        if (two) {
+          yt[1] = hsum(vld1q_f32(acc + 16)); yt[ldy + 1] = hsum(vld1q_f32(acc + 20));
+          yt[2 * ldy + 1] = hsum(vld1q_f32(acc + 24)); yt[3 * ldy + 1] = hsum(vld1q_f32(acc + 28));
+        }
+      }
     for (; t + 4 <= n && in % 4 == 0; t += 4) {
       const float *x0 = x + (size_t)t * in, *x1 = x0 + in, *x2 = x1 + in, *x3 = x2 + in;
       float32x4_t a00 = vdupq_n_f32(0), a01 = a00, a02 = a00, a03 = a00;
