@@ -20,7 +20,8 @@ B=$W/bin-$LABEL
 mkdir -p "$OUT" "$B"
 for v in plain neon; do
   if [ $v = plain ]; then fpu=vfpv3-d16; else fpu=neon; fi
-  make -s -B -C "$ROOT" CC="$ROOT/scripts/jibo-cc.sh" OUT="$B/$v-build" \
+  rm -rf "$B/$v-build"  # a fresh build; not make -B, which would regenerate sources in the tree
+  make -s -C "$ROOT" CC="$ROOT/scripts/jibo-cc.sh" OUT="$B/$v-build" \
     CFLAGS="-O2 -mfpu=$fpu -DJD_PROFILE" "$B/$v-build/bench-engine"
   cp "$B/$v-build/bench-engine" "$B/$v"
 done

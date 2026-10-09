@@ -1,0 +1,2 @@
+baseline	the tree before optimisation
+r1-named-acc	plain dot: eight named accumulators instead of a lane array, which GCC kept on the stack

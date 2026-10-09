@@ -196,6 +196,20 @@ All on x86 (this is not the robot), against v21 unless marked v22:
 - **Emulated ARMv7** (qemu, NEON kernels): the tiny-model parity tests pass.
 - **GL matmul:** matches the CPU kernel to 2e-6 relative on Mesa llvmpipe.
 
+## ARMv7 instruction counts
+
+Exact user-space instructions retired, counted in full-system qemu with `-icount`
+([perfvm/README.md](perfvm/README.md)), in billions, on the first four layers of the v22 export
+(three DeltaNet layers, one attention layer). Every change passes `perfvm/gate.sh` first: the
+hidden states of every layer and every answer are the same to the bit as before any change, for
+x86, ARM plain and ARM NEON. Plain is the shipped build (`-mfpu=vfpv3-d16`).
+
+<!-- rounds: python perfvm/table.py -->
+| round | change | plain prefill | plain prefix_hit | plain request3 | NEON prefill | NEON prefix_hit | NEON request3 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `baseline` | the tree before optimisation | 77.77 | 49.09 | 172.46 | 11.46 | 7.69 | 26.58 |
+| `r1-named-acc` | plain dot: eight named accumulators instead of a lane array, which GCC kept on the stack | 35.57 (-54%) | 22.77 (-54%) | 79.55 (-54%) | 11.46 (+0%) | 7.69 (+0%) | 26.58 (+0%) |
+
 ## Not done yet
 
 - Everything on the robot (Phases 4 to 8; `scripts/robot-run.sh` has the steps), and the GL

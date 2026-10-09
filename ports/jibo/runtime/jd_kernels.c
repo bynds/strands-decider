@@ -64,13 +64,23 @@ static float dot(const float *a, const float *b, int n) {
   for (; i < n; i++) acc += a[i] * b[i];
   return acc;
 #else
-  /* eight independent lanes, which compilers vectorise without -ffast-math */
-  float acc[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+  /* Eight independent lanes, which compilers vectorise without -ffast-math. Named, not an
+   * array: GCC keeps an accumulator array on the stack on 32-bit ARM, a load and a store per
+   * multiply-add. */
+  float s0 = 0, s1 = 0, s2 = 0, s3 = 0, s4 = 0, s5 = 0, s6 = 0, s7 = 0;
   int i = 0;
-  for (; i + 8 <= n; i += 8)
-    for (int j = 0; j < 8; j++) acc[j] += a[i + j] * b[i + j];
-  for (; i < n; i++) acc[0] += a[i] * b[i];
-  return ((acc[0] + acc[4]) + (acc[1] + acc[5])) + ((acc[2] + acc[6]) + (acc[3] + acc[7]));
+  for (; i + 8 <= n; i += 8) {
+    s0 += a[i] * b[i];
+    s1 += a[i + 1] * b[i + 1];
+    s2 += a[i + 2] * b[i + 2];
+    s3 += a[i + 3] * b[i + 3];
+    s4 += a[i + 4] * b[i + 4];
+    s5 += a[i + 5] * b[i + 5];
+    s6 += a[i + 6] * b[i + 6];
+    s7 += a[i + 7] * b[i + 7];
+  }
+  for (; i < n; i++) s0 += a[i] * b[i];
+  return ((s0 + s4) + (s1 + s5)) + ((s2 + s6) + (s3 + s7));
 #endif
 }
 
