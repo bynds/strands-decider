@@ -209,6 +209,7 @@ x86, ARM plain and ARM NEON. Plain is the shipped build (`-mfpu=vfpv3-d16`).
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | `baseline` | the tree before optimisation | 77.77 | 49.09 | 172.46 | 11.46 | 7.69 | 26.58 |
 | `r1-named-acc` | plain dot: eight named accumulators instead of a lane array, which GCC kept on the stack | 35.57 (-54%) | 22.77 (-54%) | 79.55 (-54%) | 11.46 (+0%) | 7.69 (+0%) | 26.58 (+0%) |
+| `r2-vfp-asm` | plain dot: the inner loop in VFP assembly, two 8-register vldmia and eight vmla per 8 inputs | 17.56 (-77%) | 11.54 (-76%) | 39.91 (-77%) | 11.46 (+0%) | 7.69 (+0%) | 26.58 (+0%) |
 
 ## Not done yet
 

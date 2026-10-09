@@ -69,6 +69,36 @@ static float dot(const float *a, const float *b, int n) {
    * multiply-add. */
   float s0 = 0, s1 = 0, s2 = 0, s3 = 0, s4 = 0, s5 = 0, s6 = 0, s7 = 0;
   int i = 0;
+#if defined(__arm__) && defined(__ARM_FP)
+  /* VFP: two 8-register loads with post-increment and eight non-fused vmla per 8 inputs, 12
+   * instructions where GCC emits 29. Each lane adds its products in the same order as the C
+   * below, so the result is the same to the bit. s16-s31 are callee-saved: as clobbers, GCC
+   * saves them once per call. */
+  if (n >= 8) {
+    const float *pa = a, *pb = b;
+    int k = n / 8;
+    __asm__ volatile(
+        "1:\n\t"
+        "vldmia %[pa]!, {s16-s23}\n\t"
+        "vldmia %[pb]!, {s24-s31}\n\t"
+        "vmla.f32 %[s0], s16, s24\n\t"
+        "vmla.f32 %[s1], s17, s25\n\t"
+        "vmla.f32 %[s2], s18, s26\n\t"
+        "vmla.f32 %[s3], s19, s27\n\t"
+        "vmla.f32 %[s4], s20, s28\n\t"
+        "vmla.f32 %[s5], s21, s29\n\t"
+        "vmla.f32 %[s6], s22, s30\n\t"
+        "vmla.f32 %[s7], s23, s31\n\t"
+        "subs %[k], %[k], #1\n\t"
+        "bne 1b"
+        : [pa] "+r"(pa), [pb] "+r"(pb), [k] "+r"(k), [s0] "+t"(s0), [s1] "+t"(s1), [s2] "+t"(s2),
+          [s3] "+t"(s3), [s4] "+t"(s4), [s5] "+t"(s5), [s6] "+t"(s6), [s7] "+t"(s7)
+        :
+        : "cc", "memory", "s16", "s17", "s18", "s19", "s20", "s21", "s22", "s23", "s24", "s25", "s26",
+          "s27", "s28", "s29", "s30", "s31");
+    i = n & ~7;
+  }
+#endif
   for (; i + 8 <= n; i += 8) {
     s0 += a[i] * b[i];
     s1 += a[i + 1] * b[i + 1];
